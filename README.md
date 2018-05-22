@@ -1,2 +1,3 @@
 # pytorch-crf
-PyTorch implementation of a Bi-LSTM CRF
+
+Yet another PyTorch implementation of a Bi-LSTM CRF
