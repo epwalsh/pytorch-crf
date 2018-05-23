@@ -40,6 +40,10 @@ class Dataset:
         vocab : :obj:`yapycrf.io.Vocab`.
             The vocab instance to apply to the sentences.
 
+        Returns
+        -------
+        None
+
         """
         with open(fname, "w") as f:
             pass

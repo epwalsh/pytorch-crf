@@ -9,7 +9,14 @@ from yapycrf.io.vocab import Vocab
 @pytest.fixture(scope="session")
 def vocab():
     """Create a vocab object as a fixture, so use across all test sessions."""
-    return Vocab(cache="test/.vector_cache")
+    return Vocab(["O", "B-LOC", "I-LOC"], cache="test/.vector_cache")
+
+
+def test_labels(vocab):
+    """Test that the target label attributes and methods work."""
+    assert vocab.n_labels == 3
+    assert vocab.labels_stoi["O"] == 0
+    assert vocab.labels_itos[0] == "O"
 
 
 def test_chars(vocab):
