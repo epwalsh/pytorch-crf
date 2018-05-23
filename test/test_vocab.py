@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 """Tests for Vocab object."""
 
 import pytest
@@ -34,6 +32,7 @@ def test_vectors(vocab):
 
 cases = [
     ["hi", "there"],
+    ["hi"],
 ]
 
 

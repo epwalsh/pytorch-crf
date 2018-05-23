@@ -1,6 +1,8 @@
 test = ./test/
 
-SRCS = $(wildcard ./yapycrf/*.py ./yapycrf/*/*.py)
+PYTHON_VERSION := `grep "python:" Dockerfile | head -1 | sed -r 's/.*([0-9]\.[0-9]).*/\1/g'`
+IMAGE_TAG      := python$(PYTHON_VERSION)
+
 
 .PHONY : help
 help :
