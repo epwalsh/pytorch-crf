@@ -140,3 +140,20 @@ class Vocab:
                 tmp_list.append(tmp.view(1, -1))
             char_tensors.append(torch.cat(tmp_list))
         return char_tensors, torch.cat(word_tensors, dim=0)
+
+    def labs2tensor(self, labs):
+        """
+        Transform a list of labels to a tensor.
+
+        Parameters
+        ----------
+        labs : list of str
+            The list of labels to transform.
+
+        Returns
+        -------
+        :obj:`torch.Tensor`
+            The tensor of integers corresponding to the list of labels.
+
+        """
+        return torch.Tensor([self.labels_stoi[lab] for lab in labs])
