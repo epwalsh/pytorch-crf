@@ -1,6 +1,7 @@
 """Defines a class for holding a vocabulary set."""
 
 import logging
+import string
 
 import torch
 import torchtext
@@ -61,14 +62,18 @@ class Vocab:
         self.glove = torchtext.vocab.GloVe(
             name="6B", dim=self.word_vec_dim, cache=cache)
 
-        for tok in self.glove.stoi:
-            for char in tok:
-                ind = self.chars_stoi.setdefault(
-                    char, len(self.chars_stoi))
-                self.chars_itos.setdefault(ind, char)
-                ind = self.chars_stoi.setdefault(
-                    char.upper(), len(self.chars_stoi))
-                self.chars_itos.setdefault(ind, char.upper())
+        for char in string.ascii_letters + string.digits + string.punctuation:
+            ind = self.chars_stoi.setdefault(
+                char, len(self.chars_stoi))
+            self.chars_itos.setdefault(ind, char)
+            ind = self.chars_stoi.setdefault(
+                char.upper(), len(self.chars_stoi))
+            self.chars_itos.setdefault(ind, char.upper())
+
+    @property
+    def n_words(self):
+        """Get the number of words."""
+        return len(self.glove.stoi)
 
     @property
     def n_chars(self):
@@ -81,7 +86,7 @@ class Vocab:
 
         Parameters
         ----------
-        sent : str
+        sent : list of str
             The sentence to transform.
 
         Returns
@@ -104,4 +109,4 @@ class Vocab:
                 tmp[self.chars_stoi.get(char, 0)] = 1
                 tmp_list.append(tmp.view(1, -1))
             char_tensors.append(torch.cat(tmp_list))
-        return char_tensors, word_tensors
+        return char_tensors, torch.cat(word_tensors, dim=0)

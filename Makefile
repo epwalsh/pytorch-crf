@@ -1,3 +1,5 @@
+test = ./test/
+
 SRCS = $(wildcard ./yapycrf/*.py ./yapycrf/*/*.py)
 
 .PHONY : help
@@ -14,4 +16,4 @@ lint :
 
 .PHONY : test
 test :
-	@pytest ./test/
+	@export PYTHONPATH=. && pytest $(test)
