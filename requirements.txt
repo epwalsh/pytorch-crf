@@ -1,2 +1,5 @@
 torch
 torchtext
+pytest
+pylint
+pydocstyle
