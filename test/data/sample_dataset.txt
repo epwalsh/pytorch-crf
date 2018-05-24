@@ -1,0 +1,15 @@
+hi	O
+there	O
+
+my	O
+name	O
+is	O
+Pete	B-NAME
+
+I'	O
+m	O
+Evan	B-NAME
+Walsh	I-NAME
+
+hello	O
+

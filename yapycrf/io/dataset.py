@@ -51,7 +51,7 @@ class Dataset:
         None
 
         """
-        with open(fname, "w") as datafile:
+        with open(fname, "r") as datafile:
             src = []
             tgt = []
             for line in datafile.readlines():
