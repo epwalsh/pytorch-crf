@@ -31,6 +31,9 @@ class Vocab:
     unk_char : str
         The code to use for unknown chars.
 
+    pad_char : str
+        The code to use for padding chars.
+
     word_vec_dim : int
         The dimension of the vector word embedding. As of now, can only be 50,
         100, 200, or 300.
@@ -59,6 +62,9 @@ class Vocab:
     unk_char : str
         The code to use for unknown chars.
 
+    pad_char : str
+        The code to use for padding chars.
+
     glove : :obj:`torchtext.vocab.GloVe`
         GloVe word embeddings.
 
@@ -71,15 +77,20 @@ class Vocab:
     """
 
     def __init__(self, labels, default_label="O", unk_term="UNK",
-                 unk_char="UNK", word_vec_dim=300, cache=None):
+                 pad_char="PAD", unk_char="UNK", word_vec_dim=300, cache=None):
         self.default_label = default_label
         self.labels_stoi = {default_label: 0}
         self.labels_itos = {0: default_label}
+
         self.unk_term = unk_term
         self.unk_char = unk_char
+        self.pad_char = pad_char
+
         self.word_vec_dim = word_vec_dim
-        self.chars_stoi = {unk_char: 0}
-        self.chars_itos = {0: unk_char}
+
+        self.chars_stoi = {pad_char: 0, unk_char: 1}
+        self.chars_itos = {0: pad_char, 1: unk_char}
+
         self.glove = torchtext.vocab.GloVe(
             name="6B", dim=self.word_vec_dim, cache=cache)
 

@@ -17,8 +17,10 @@ def test_labels(vocab):
 
 def test_chars(vocab):
     """Check to make sure the vocab characters are initialized correctly."""
-    assert vocab.chars_stoi[vocab.unk_char] == 0
-    assert vocab.chars_itos[0] == vocab.unk_char
+    assert vocab.chars_stoi[vocab.pad_char] == 0
+    assert vocab.chars_stoi[vocab.unk_char] == 1
+    assert vocab.chars_itos[0] == vocab.pad_char
+    assert vocab.chars_itos[1] == vocab.unk_char
     assert vocab.n_chars == len(vocab.chars_stoi) == len(vocab.chars_itos)
     assert vocab.n_chars < 100
 
