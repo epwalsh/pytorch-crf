@@ -19,3 +19,8 @@ lint :
 .PHONY : test
 test :
 	@export PYTHONPATH=. && pytest $(test)
+
+.PHONY : create-branch
+create-branch :
+	git checkout -b ISSUE-$(num)
+	git push --set-upstream origin ISSUE-$(num)

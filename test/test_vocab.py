@@ -3,19 +3,24 @@
 import pytest
 import torch
 
-from yapycrf.io.vocab import Vocab
 
-
-@pytest.fixture(scope="session")
-def vocab():
-    """Create a vocab object as a fixture, so use across all test sessions."""
-    return Vocab(cache="test/.vector_cache")
+def test_labels(vocab):
+    """Test that the target label attributes and methods work."""
+    assert vocab.n_labels == 3
+    assert vocab.labels_stoi["O"] == 0
+    assert vocab.labels_itos[0] == "O"
+    assert vocab.labels_stoi["B-NAME"] == 1
+    assert vocab.labels_itos[1] == "B-NAME"
+    assert vocab.labels_stoi["I-NAME"] == 2
+    assert vocab.labels_itos[2] == "I-NAME"
 
 
 def test_chars(vocab):
     """Check to make sure the vocab characters are initialized correctly."""
-    assert vocab.chars_stoi[vocab.unk_char] == 0
-    assert vocab.chars_itos[0] == vocab.unk_char
+    assert vocab.chars_stoi[vocab.pad_char] == 0
+    assert vocab.chars_stoi[vocab.unk_char] == 1
+    assert vocab.chars_itos[0] == vocab.pad_char
+    assert vocab.chars_itos[1] == vocab.unk_char
     assert vocab.n_chars == len(vocab.chars_stoi) == len(vocab.chars_itos)
     assert vocab.n_chars < 100
 
