@@ -1,14 +1,13 @@
-"""
-Implements a character-sequence LSTM.
-"""
+"""Implements a character-sequence LSTM to generate words features."""
 
+import torch
 import torch.nn as nn
 from torch.nn import LSTM
 
 
 class CharLSTM(nn.Module):
     """
-    Character LSTM.
+    Character LSTM for generating word features from the final hidden state.
 
     Parameters
     ----------
@@ -58,29 +57,34 @@ class CharLSTM(nn.Module):
 
         Parameters
         ----------
-        inputs : :obj:`torch.Tensor`
-            A tensor or :obj:`torch.nn.utils.rnn.PackedSequence` of shape
-            `[batch_size x max_word_length x n_chars]`.
+        inputs : list of :obj:`torch.Tensor`
+            List of tensors of shape `[word_length x n_chars]`.
 
         Returns
         -------
         :obj:`torch.Tensor`
-            The last hidden state:
-            `[batch_size x (layers x directions x hidden_size)]`
+            The last hidden states:
+            `[len(inputs) x (layers x directions x hidden_size)]`
 
         """
-        _, state = self.rnn(inputs)
+        hiddens = []
+        for word in inputs:
+            _, state = self.rnn(word.unsqueeze(0))
 
-        # `[(layers x directions) x batch_size x hidden_size]`
-        hidden = state[0]
+            # `[(layers x directions) x 1 x hidden_size]`
+            hidden = state[0]
 
-        # Put back to `batch_first` alignment.
-        # Changes to `[batch_size x (layers x directions) x hidden_size]`
-        hidden = hidden.permute(1, 0, 2)
-        hidden = hidden.contiguous()
+            # Get rid of batch_size dimension.
+            # `[(layers x directions) x hidden_size]`
+            hidden = hidden.squeeze()
 
-        # Concatenate forward/backward hidden states.
-        # Changes to `[batch_size x (layers x directions x hidden_size)]`.
-        hidden = hidden.view(2, -1)
+            # Concatenate forward/backward hidden states.
+            # Changes to `[1 x (layers x directions x hidden_size)]`.
+            hidden = hidden.view(-1).unsqueeze(0)
 
-        return hidden
+            hiddens.append(hidden)
+
+        # `[words x (layers x directions x hidden_size)]`
+        hiddens = torch.cat(hiddens, dim=0)
+
+        return hiddens

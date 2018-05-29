@@ -172,7 +172,7 @@ class Tagger(nn.Module):
 
     def forward(self, sentence):
         """
-        Not to be consfused with the forward algorithm, this predicts a label
+        Not to be confused with the forward algorithm, this predicts a label
         sequence given the input sentence and also outputs the score.
         """
         # Get the emission scores from the BiLSTM
