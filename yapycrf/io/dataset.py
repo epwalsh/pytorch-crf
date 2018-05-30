@@ -1,29 +1,38 @@
 """Defines dataset class."""
 
 import logging
+from typing import List, Tuple
+
+import torch
+
+from .vocab import Vocab
 
 
 logger = logging.getLogger(__name__)
 
 
+SourceType = Tuple[List[torch.Tensor], torch.Tensor]
+TargetType = torch.Tensor
+
+
 class Dataset:
     """Class for abstracting training and testing datasets."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.source = []
         self.target = []
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int) -> Tuple[SourceType, TargetType]:
         return self.source[key], self.target[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Tuple[SourceType, TargetType]:
         for src, tgt in zip(self.source, self.target):
             yield src, tgt
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.source)
 
-    def load_file(self, fname, vocab):
+    def load_file(self, fname: str, vocab: Vocab) -> None:
         """
         Load sentences from a file.
 

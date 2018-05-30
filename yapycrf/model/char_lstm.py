@@ -1,5 +1,7 @@
 """Implements a character-sequence LSTM to generate words features."""
 
+from typing import List
+
 import torch
 import torch.nn as nn
 from torch.nn import LSTM
@@ -40,13 +42,18 @@ class CharLSTM(nn.Module):
 
     """
 
-    def __init__(self, n_chars, hidden_size, bidirectional=True, layers=1,
-                 dropout=0):
+    def __init__(self, n_chars: int,
+                 hidden_size: int,
+                 bidirectional: bool = True,
+                 layers: int = 1,
+                 dropout: float = 0.) -> None:
         super(CharLSTM, self).__init__()
+
         self.n_chars = n_chars
         self.output_size = layers * hidden_size
         if bidirectional:
             self.output_size *= 2
+
         self.rnn = LSTM(input_size=self.n_chars,
                         hidden_size=hidden_size,
                         num_layers=layers,
@@ -54,7 +61,7 @@ class CharLSTM(nn.Module):
                         dropout=dropout,
                         bidirectional=bidirectional)
 
-    def forward(self, inputs):
+    def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         """
         Make a forward pass through the network.
 

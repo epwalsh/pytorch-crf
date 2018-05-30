@@ -240,8 +240,3 @@ class Tagger(nn.Module):
         Simply returns the negative log-likelihood.
         """
         return self.neg_log_likelihood(chars, words, labs, lens=lens)
-
-
-def foo_to() -> None:
-    """Does nothing"""
-    return None
