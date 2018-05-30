@@ -25,7 +25,7 @@ class Trainable(ABC):
 
     @staticmethod
     @abstractmethod
-    def cl_init(opts: argparse.Namespace) -> nn.Module:
+    def cl_init(opts: argparse.Namespace, vocab: Vocab) -> nn.Module:
         """
         Initialize a model from the command line given the parsed arguments.
         """
@@ -33,6 +33,9 @@ class Trainable(ABC):
 
 
 class BiLSTMCRF(Trainable):
+    """
+    Bi-LSTM CRF model.
+    """
 
     @staticmethod
     def cl_opts(parser: argparse.ArgumentParser) -> None:

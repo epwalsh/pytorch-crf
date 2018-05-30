@@ -1,7 +1,7 @@
 """Defines dataset class."""
 
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Generator, Type
 
 import torch
 
@@ -12,20 +12,20 @@ logger = logging.getLogger(__name__)
 
 
 SourceType = Tuple[List[torch.Tensor], torch.Tensor]
-TargetType = torch.Tensor
+TargetType = Type[torch.Tensor]
 
 
 class Dataset:
     """Class for abstracting training and testing datasets."""
 
     def __init__(self) -> None:
-        self.source = []
-        self.target = []
+        self.source: List[SourceType] = []
+        self.target: List[TargetType] = []
 
     def __getitem__(self, key: int) -> Tuple[SourceType, TargetType]:
         return self.source[key], self.target[key]
 
-    def __iter__(self) -> Tuple[SourceType, TargetType]:
+    def __iter__(self) -> Generator[Tuple[SourceType, TargetType], None, None]:
         for src, tgt in zip(self.source, self.target):
             yield src, tgt
 
@@ -73,11 +73,11 @@ class Dataset:
         """
         i = 0
         with open(fname, "r") as datafile:
-            src = []
-            tgt = []
+            src: List[str] = []
+            tgt: List[str] = []
             for line in datafile.readlines():
-                line = line.rstrip().split('\t')
-                if len(line) == 1:  # end of sentence.
+                line_list = line.rstrip().split('\t')
+                if len(line_list) == 1:  # end of sentence.
                     char_tensors, word_tensors = vocab.sent2tensor(src)
                     target_tensor = vocab.labs2tensor(tgt)
                     self.source.append((char_tensors, word_tensors))
@@ -88,5 +88,5 @@ class Dataset:
                     if limit is not None and i == limit:
                         break
                 else:
-                    src.append(line[0])
-                    tgt.append(line[1])
+                    src.append(line_list[0])
+                    tgt.append(line_list[1])

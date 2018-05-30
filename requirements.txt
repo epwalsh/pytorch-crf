@@ -1,5 +1,6 @@
 torchtext
 pytest
 pytest-cov
+mypy
 pylint
 pydocstyle

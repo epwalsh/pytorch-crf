@@ -11,6 +11,10 @@ help :
 		"  lint: run pylint and pydocstyle on source files.\n"\
 		"  test: run pytest on the test/ directory."
 
+.PHONY : typecheck
+typecheck :
+	-@mypy ./yapycrf/ --ignore-missing-imports
+
 .PHONY : lint
 lint :
 	-@pydocstyle --config=./.pydocstyle ./yapycrf/*
