@@ -2,6 +2,7 @@
 
 import logging
 import string
+from typing import List, Tuple
 
 import torch
 import torchtext
@@ -76,8 +77,14 @@ class Vocab:
 
     """
 
-    def __init__(self, labels, default_label="O", unk_term="UNK",
-                 pad_char="PAD", unk_char="UNK", word_vec_dim=300, cache=None):
+    def __init__(self,
+                 labels: List[str],
+                 default_label: str = "O",
+                 unk_term: str = "UNK",
+                 pad_char: str = "PAD",
+                 unk_char: str = "UNK",
+                 word_vec_dim: int = 300,
+                 cache: str = None) -> None:
         self.default_label = default_label
         self.labels_stoi = {default_label: 0}
         self.labels_itos = {0: default_label}
@@ -107,21 +114,22 @@ class Vocab:
             self.chars_itos.setdefault(ind, char.upper())
 
     @property
-    def n_words(self):
+    def n_words(self) -> int:
         """Get the number of words."""
         return len(self.glove.stoi)
 
     @property
-    def n_chars(self):
+    def n_chars(self) -> int:
         """Get the number of characters."""
         return len(self.chars_stoi)
 
     @property
-    def n_labels(self):
+    def n_labels(self) -> int:
         """Get the number of target labels."""
         return len(self.labels_itos)
 
-    def sent2tensor(self, sent):
+    def sent2tensor(self,
+                    sent: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Transform a sentence into a tensor.
 
@@ -132,7 +140,7 @@ class Vocab:
 
         Returns
         -------
-        tuple (list of :obj:`torch.tensor`, :obj:`torch.tensor`)
+        tuple (list of :obj:`torch.Tensor`, :obj:`torch.Tensor`)
             The first item is a list of length `len(sent)` of tensors, each of
             which has size `[len(sent[i]) x self.n_chars]`.
             The second item has is a tensor of size
@@ -152,7 +160,7 @@ class Vocab:
             char_tensors.append(torch.cat(tmp_list))
         return char_tensors, torch.cat(word_tensors, dim=0)
 
-    def labs2tensor(self, labs):
+    def labs2tensor(self, labs: List[str]) -> torch.Tensor:
         """
         Transform a list of labels to a tensor.
 
@@ -167,4 +175,5 @@ class Vocab:
             The tensor of integers corresponding to the list of labels.
 
         """
-        return torch.Tensor([self.labels_stoi[lab] for lab in labs])
+        # pylint: disable=not-callable
+        return torch.tensor([self.labels_stoi.get(lab, 0) for lab in labs])

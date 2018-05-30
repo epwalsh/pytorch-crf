@@ -1,5 +1,7 @@
+allennlp
 torch
 torchtext
 pytest
+pytest-cov
 pylint
 pydocstyle

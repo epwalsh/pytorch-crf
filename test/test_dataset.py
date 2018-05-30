@@ -25,11 +25,11 @@ def test_source(dataset, vocab):
 def test_target(dataset, vocab):
     """Make sure the `target` attr contains what we expect."""
     assert len(dataset.target) == 4
-    assert (dataset.target[0] == torch.Tensor([0., 0.])).all()\
+    assert (dataset.target[0] == torch.tensor([0, 0])).all()\
         .item() == 1
-    assert (dataset.target[1] == torch.Tensor([0., 0., 0., 1.]))\
+    assert (dataset.target[1] == torch.tensor([0, 0, 0, 1]))\
         .all().item() == 1
-    assert (dataset.target[2] == torch.Tensor([0., 0., 1., 2.]))\
+    assert (dataset.target[2] == torch.tensor([0, 0, 1, 2]))\
         .all().item() == 1
-    assert (dataset.target[3] == torch.Tensor([0.]))\
+    assert (dataset.target[3] == torch.tensor([0]))\
         .all().item() == 1
