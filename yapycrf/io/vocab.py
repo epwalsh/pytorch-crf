@@ -77,7 +77,8 @@ class Vocab:
 
     """
 
-    def __init__(self, labels: List[str],
+    def __init__(self,
+                 labels: List[str],
                  default_label: str = "O",
                  unk_term: str = "UNK",
                  pad_char: str = "PAD",
@@ -174,4 +175,5 @@ class Vocab:
             The tensor of integers corresponding to the list of labels.
 
         """
+        # pylint: disable=not-callable
         return torch.tensor([self.labels_stoi.get(lab, 0) for lab in labs])

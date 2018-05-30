@@ -1,3 +1,4 @@
+"""Defines nn module classes for building a model."""
+
 from .char_lstm import CharLSTM
-from .crf import CRF
 from .tagger import Tagger

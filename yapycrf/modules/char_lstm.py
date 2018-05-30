@@ -42,7 +42,8 @@ class CharLSTM(nn.Module):
 
     """
 
-    def __init__(self, n_chars: int,
+    def __init__(self,
+                 n_chars: int,
                  hidden_size: int,
                  bidirectional: bool = True,
                  layers: int = 1,
@@ -77,6 +78,7 @@ class CharLSTM(nn.Module):
             `[len(inputs) x (layers * directions * hidden_size)]`
 
         """
+        # pylint: disable=arguments-differ
         hiddens = []
         for word in inputs:
             _, state = self.rnn(word.unsqueeze(0))

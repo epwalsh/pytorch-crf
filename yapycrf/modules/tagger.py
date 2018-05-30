@@ -1,9 +1,14 @@
 """Defines a Bi-LSMT CRF model."""
 
+from typing import List
+
 import torch
 import torch.nn as nn
 
+from allennlp.modules.conditional_random_field import ConditionalRandomField
+from yapycrf.io import Vocab
 from .utils import sequence_mask
+from .char_lstm import CharLSTM
 
 
 class Tagger(nn.Module):
@@ -59,12 +64,18 @@ class Tagger(nn.Module):
 
     """
 
-    def __init__(self, vocab, char_lstm, crf, hidden_dim=100, layers=1,
-                 dropout=0,
-                 bidirectional=True):
+    def __init__(self,
+                 vocab: Vocab,
+                 char_lstm: CharLSTM,
+                 crf: ConditionalRandomField,
+                 hidden_dim: int = 100,
+                 layers: int = 1,
+                 dropout: float = 0.,
+                 bidirectional: bool = True) -> None:
         super(Tagger, self).__init__()
 
         assert vocab.n_chars == char_lstm.n_chars
+        assert vocab.n_labels == crf.num_tags
 
         self.vocab = vocab
         self.char_lstm = char_lstm
@@ -90,9 +101,11 @@ class Tagger(nn.Module):
 
         # Linear layer that takes the output from the recurrent layer and each
         # time step and transforms into scores for each label.
-        self.rnn_to_crf = nn.Linear(self.rnn_output_size, self.crf.n_labels)
+        self.rnn_to_crf = nn.Linear(self.rnn_output_size, self.vocab.n_labels)
 
-    def _feats(self, chars, words):
+    def _feats(self,
+               chars: List[torch.Tensor],
+               words: torch.Tensor) -> torch.Tensor:
         """
         Generate features for the CRF from input.
 
@@ -103,7 +116,7 @@ class Tagger(nn.Module):
 
         Parameters
         ----------
-        chars : list of :obj:`Tensor`
+        chars : list of :obj:`torch.Tensor`
             List of tensors with shape `[word_lenth x n_chars]`.
 
         words : :obj:`Tensor`
@@ -142,7 +155,10 @@ class Tagger(nn.Module):
 
         return feats
 
-    def _score(self, feats, labs, lens):
+    def _score(self,
+               feats: torch.Tensor,
+               labs: torch.Tensor,
+               lens: torch.Tensor) -> torch.Tensor:
         # Gather the score for each actual label.
         # scores: `[batch_size x sent_length]`
         scores = torch.gather(feats, 2, labs.unsqueeze(-1)).squeeze(-1)
@@ -160,7 +176,10 @@ class Tagger(nn.Module):
 
         return score
 
-    def predict(self, chars, words, lens=None):
+    def predict(self,
+                chars: List[torch.Tensor],
+                words: torch.Tensor,
+                lens: torch.Tensor = None) -> List[List[int]]:
         """
         Outputs the best tag sequence.
 
@@ -175,24 +194,29 @@ class Tagger(nn.Module):
 
         Returns
         -------
-        tuple (:obj:`Tensor`, :obj:`LongTensor`)
-            The viterbi scores `[batch_size]` and best paths
-            `[batch_size x seq_len]`.
+        List[List[int]]
+            The best path for each sentence in the batch.
 
         """
+        # pylint: disable=not-callable
         if lens is None:
             lens = torch.tensor([words.size(0)])
+        mask = sequence_mask(lens)
 
         # Gather word feats.
         # feats: `[1 x sent_length x n_labels]`
         feats = self._feats(chars, words)
 
-        # Run features through Viterbi decode.
-        scores, preds = self.crf.viterbi_decode(feats, lens)
+        # Run features through Viterbi decode algorithm.
+        preds = self.crf.viterbi_tags(feats, mask)
 
-        return scores, preds
+        return preds
 
-    def neg_log_likelihood(self, chars, words, labs, lens=None):
+    def forward(self,
+                chars: List[torch.Tensor],
+                words: torch.Tensor,
+                labs: torch.Tensor,
+                lens: torch.Tensor = None) -> torch.Tensor:
         """
         Computes the negative of the log-likelihood.
 
@@ -210,12 +234,14 @@ class Tagger(nn.Module):
 
         Returns
         -------
-        float
+        :obj:`torch.Tensor`
             The negative log-likelihood evaluated at the inputs.
 
         """
+        # pylint: disable=arguments-differ,not-callable
         if lens is None:
             lens = torch.tensor([words.size(0)])
+        mask = sequence_mask(lens)
 
         # Fake batch dimension for labs.
         # labs: `[1 x sent_length]`
@@ -225,18 +251,6 @@ class Tagger(nn.Module):
         # feats: `[1 x sent_length x n_labels]`
         feats = self._feats(chars, words)
 
-        # Get the normalizing constant.
-        # log_z: `[batch_size]`
-        log_z = self.crf.forward_alg(feats, lens)
+        loglik = self.crf(feats, labs, mask=mask)
 
-        # Get the score of the sequence.
-        # score: `[batch_size]`
-        score = self._score(feats, labs, lens)
-
-        return log_z - score
-
-    def forward(self, chars, words, labs, lens=None):
-        """
-        Simply returns the negative log-likelihood.
-        """
-        return self.neg_log_likelihood(chars, words, labs, lens=lens)
+        return -1. * loglik

@@ -2,9 +2,10 @@
 
 import pytest
 
+from allennlp.modules.conditional_random_field import ConditionalRandomField
 from yapycrf.io.dataset import Dataset
 from yapycrf.io.vocab import Vocab
-from yapycrf.model import CharLSTM, CRF, Tagger
+from yapycrf.modules import CharLSTM, Tagger
 
 
 LABELS = ["O", "B-NAME", "I-NAME"]
@@ -24,7 +25,7 @@ def dataset(vocab):
 
 @pytest.fixture(scope="session")
 def crf():
-    return CRF(len(LABELS))
+    return ConditionalRandomField(len(LABELS))
 
 
 @pytest.fixture(scope="session")

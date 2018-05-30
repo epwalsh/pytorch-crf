@@ -5,16 +5,6 @@ Small helper functions.
 import torch
 
 
-def log_sum_exp(vec, dim=0):
-    """
-    Computes log-sum-exp along the specified dimension in a numerically stable
-    way.
-    """
-    max_score, _ = torch.max(vec, dim)
-    max_exp = max_score.unsqueeze(-1).expand_as(vec)
-    return max_score + torch.log(torch.sum(torch.exp(vec - max_exp), dim))
-
-
 def sequence_mask(lens, max_len=None):
     """
     Compute sequence mask.
@@ -36,7 +26,7 @@ def sequence_mask(lens, max_len=None):
     batch_size = lens.size(0)
 
     if max_len is None:
-        max_len = lens.max().data[0]
+        max_len = lens.max().item()
 
     ranges = torch.arange(0, max_len).long()
     ranges = ranges.unsqueeze(0).expand(batch_size, max_len)

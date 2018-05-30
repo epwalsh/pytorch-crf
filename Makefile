@@ -18,7 +18,7 @@ lint :
 
 .PHONY : test
 test :
-	@export PYTHONPATH=. && pytest $(test)
+	@export PYTHONPATH=. && pytest --cov=yapycrf $(test)
 
 .PHONY : create-branch
 create-branch :
