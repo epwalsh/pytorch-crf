@@ -17,48 +17,48 @@ class Tagger(nn.Module):
 
     Parameters
     ----------
-    vocab : :obj:`yapycrf.io.Vocab`
+    vocab : yapycrf.io.Vocab
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : :obj:`yapycrf.model.CharLSTM`
+    char_lstm : yapycrf.model.CharLSTM
         The character-level LSTM layer.
 
-    crf : :obj:`yapycrf.model.crf`
+    crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
 
-    hidden_dim : int
+    hidden_dim : int, optional (default: 100)
         The hidden dimension of the recurrent layer.
 
-    layers : int
+    layers : int, optional (default: 1)
         The number of layers of cells in the recurrent layer.
 
-    dropout : float
+    dropout : float, optional (default: 0.)
         The dropout probability for the recurrent layer.
 
-    bidirectional : bool
+    bidirectional : bool, optional (default: True)
         If True, bidirectional recurrent layer is used, otherwise single
         direction.
 
     Attributes
     ----------
-    vocab : :obj:`yapycrf.io.Vocab`
+    vocab : yapycrf.io.Vocab
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : :obj:`yapycrf.model.CharLSTM`
+    char_lstm : yapycrf.model.CharLSTM
         The character-level LSTM layer.
 
-    crf : :obj:`yapycrf.model.crf`
+    crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
 
     rnn_output_size : int
         The output dimension of the recurrent layer.
 
-    rnn : :obj:`nn.Module`
+    rnn : nn.Module
         The recurrent layer of the network.
 
-    rnn_to_crf : :obj:`nn.Module`
+    rnn_to_crf : nn.Module
         The linear layer that maps the hidden states from the recurrent layer
         to the label space.
 
@@ -116,10 +116,10 @@ class Tagger(nn.Module):
 
         Parameters
         ----------
-        chars : list of :obj:`torch.Tensor`
+        chars : List[torch.Tensor]
             List of tensors with shape `[word_lenth x n_chars]`.
 
-        words : :obj:`Tensor`
+        words : torch.Tensor
             Pretrained word embeddings with shape
             `[sent_length x word_emb_dim]`.
 
@@ -155,27 +155,6 @@ class Tagger(nn.Module):
 
         return feats
 
-    def _score(self,
-               feats: torch.Tensor,
-               labs: torch.Tensor,
-               lens: torch.Tensor) -> torch.Tensor:
-        # Gather the score for each actual label.
-        # scores: `[batch_size x sent_length]`
-        scores = torch.gather(feats, 2, labs.unsqueeze(-1)).squeeze(-1)
-
-        # Apply mask.
-        mask = sequence_mask(lens).float()
-        scores = scores * mask
-
-        # Take sum over each sent.
-        # score: `[batch_size]`
-        score = scores.sum(1).squeeze(-1)
-
-        # Now add the transition score.
-        score = score + self.crf.transition_score(labs, lens)
-
-        return score
-
     def predict(self,
                 chars: List[torch.Tensor],
                 words: torch.Tensor,
@@ -185,12 +164,15 @@ class Tagger(nn.Module):
 
         Parameters
         ----------
-        chars : list of :obj:`Tensor`
+        chars : List[torch.Tensor]
             List of tensors with shape `[word_lenth x n_chars]`.
 
-        words : :obj:`Tensor`
+        words : torch.Tensor
             Pretrained word embeddings with shape
             `[sent_length x word_emb_dim]`.
+
+        lens : torch.Tensor, optional (default: None)
+            Gives the length of each sentence in the batch `[batch_size]`.
 
         Returns
         -------
@@ -222,19 +204,22 @@ class Tagger(nn.Module):
 
         Parameters
         ----------
-        chars : list of :obj:`Tensor`
+        chars : List[torch.Tensor]
             List of tensors with shape `[word_lenth x n_chars]`.
 
-        words : :obj:`Tensor`
+        words : torch.Tensor
             Pretrained word embeddings with shape
             `[sent_length x word_emb_dim]`.
 
-        labs : :obj:`Tensor`
+        labs : torch.Tensor
             Corresponding target label sequence with shape `[sent_length]`.
+
+        lens : torch.Tensor, optional (default: None)
+            Gives the length of each sentence in the batch `[batch_size]`.
 
         Returns
         -------
-        :obj:`torch.Tensor`
+        torch.Tensor
             The negative log-likelihood evaluated at the inputs.
 
         """

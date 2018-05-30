@@ -19,13 +19,13 @@ class CharLSTM(nn.Module):
     hidden_size : int
         The number of features in the hidden state of the LSTM cells.
 
-    bidirectional : bool
+    bidirectional : bool, optional (default: True)
         If true, becomes a bidirectional LSTM.
 
-    layers : int
+    layers : int, optional (default: 1)
         The number of cell layers.
 
-    dropout : float
+    dropout : float, optional (default: 0.)
         The dropout probability for the recurrent layer.
 
     Attributes
@@ -37,7 +37,7 @@ class CharLSTM(nn.Module):
         The dimension of the output, which is
         `layers * hidden_size * directions`.
 
-    rnn : :obj:`torch.nn`
+    rnn : torch.nn
         The LSTM layer.
 
     """
@@ -68,12 +68,12 @@ class CharLSTM(nn.Module):
 
         Parameters
         ----------
-        inputs : list of :obj:`torch.Tensor`
+        inputs : List[torch.Tensor]
             List of tensors of shape `[word_length x n_chars]`.
 
         Returns
         -------
-        :obj:`torch.Tensor`
+        torch.Tensor
             The last hidden states:
             `[len(inputs) x (layers * directions * hidden_size)]`
 
