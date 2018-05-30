@@ -13,6 +13,9 @@ class Dataset:
         self.source = []
         self.target = []
 
+    def __getitem__(self, key):
+        return self.source[key], self.target[key]
+
     def __iter__(self):
         for src, tgt in zip(self.source, self.target):
             yield src, tgt

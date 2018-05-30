@@ -45,12 +45,6 @@ class CRF(nn.Module):
         self.transitions = \
             nn.Parameter(torch.randn(self.n_labels, self.n_labels))
 
-    def reset_parameters(self):
-        """
-        Resets parameters with random weights.
-        """
-        torch.nn.init.normal(self.transitions.data, 0, 1)
-
     def forward_alg(self, feats, lens):
         """
         Calculates the normalizing constant using the a forward pass of the
@@ -67,7 +61,7 @@ class CRF(nn.Module):
         Returns
         -------
         :obj:`Tensor`
-            The normalizing constants `[batch_size]`.
+            The normalizing constants `[]`.
 
         """
         batch_size, _, _ = feats.size()
@@ -92,16 +86,13 @@ class CRF(nn.Module):
 
         alpha = alpha + \
             self.transitions[self.stop_idx].unsqueeze(0).expand_as(alpha)
-        norm = log_sum_exp(alpha, 1).squeeze(-1)
+        log_z = log_sum_exp(alpha, 1).squeeze(-1)
 
-        return norm
+        return log_z
 
     def forward(self, feats, lens):
-        """
-        Output the most likely tag sequence (just applies the Viterbi
-        algorithm).
-        """
-        return self.viterbi_decode(feats, lens)
+        """Does nothing for now."""
+        pass
 
     def viterbi_decode(self, feats, lens):
         """
@@ -124,23 +115,36 @@ class CRF(nn.Module):
 
         """
         batch_size, _, n_labels = feats.size()
+
+        # vit: `[batch_size x n_labels]`
         vit = feats.data.new(batch_size, self.n_labels).fill_(-10000)
         vit[:, self.start_idx] = 0
         vit = torch.autograd.Variable(vit)
         c_lens = lens.clone()
-
-        feats_t = feats.transpose(1, 0)
         pointers = []
+
+        # feats_t: `[sent_length x batch_size x n_labels]`
+        feats_t = feats.transpose(1, 0)
         for logit in feats_t:
+            # vit_exp, trn_exp, vit_rn_sum:
+            # `[batch_size x n_labels x n_labels]`
             vit_exp = vit.unsqueeze(1).expand(batch_size, n_labels, n_labels)
             trn_exp = self.transitions.unsqueeze(0).expand_as(vit_exp)
             vit_trn_sum = vit_exp + trn_exp
+
+            # Get the most likely transition.
+            # vt_max, vt_argmax: `[batch_size x n_labels]`
             vt_max, vt_argmax = vit_trn_sum.max(2)
 
+            # Add the feature scores on (the most likely transition does not
+            # depend on the feature scores).
+            # vt_max, vit_nxt: `[batch_size x n_labels]`
             vt_max = vt_max.squeeze(-1)
             vit_nxt = vt_max + logit
-            pointers.append(vt_argmax.squeeze(-1).unsqueeze(0))
 
+            pointers.append(vt_argmax.squeeze(-1))
+
+            # mask, vit: `[batch_size x n_labels]`
             mask = (c_lens > 0).float().unsqueeze(-1).expand_as(vit_nxt)
             vit = mask * vit_nxt + (1 - mask) * vit
 
@@ -151,17 +155,13 @@ class CRF(nn.Module):
 
             c_lens = c_lens - 1
 
-        pointers = torch.cat(pointers)
         scores, idx = vit.max(1)
-        idx = idx.squeeze(-1)
-        paths = [idx.unsqueeze(1)]
+        idx = idx.unsqueeze(-1)
+        paths = [idx]
 
         for argmax in reversed(pointers):
-            idx_exp = idx.unsqueeze(-1)
-            idx = torch.gather(argmax, 1, idx_exp)
-            idx = idx.squeeze(-1)
-
-            paths.insert(0, idx.unsqueeze(1))
+            idx = torch.gather(argmax, 1, idx)
+            paths.insert(0, idx)
 
         paths = torch.cat(paths[1:], 1)
         scores = scores.squeeze(-1)
@@ -170,7 +170,8 @@ class CRF(nn.Module):
 
     def transition_score(self, labels, lens):
         """
-        Calculates transition scores from one label to the next.
+        Calculates transition scores from one label to the next, summed over
+        all sentences in the batch.
 
         Parameters
         ----------
@@ -184,7 +185,7 @@ class CRF(nn.Module):
         Returns
         -------
         :obj:`Tensor`
-            The transition scores `[batch_size]`.
+            The transition scores `[]`.
 
         """
         batch_size, seq_len = labels.size()
@@ -216,7 +217,7 @@ class CRF(nn.Module):
         trn_scr = torch.gather(trn_row, 2, lbl_lexp)
         trn_scr = trn_scr.squeeze(-1)
 
-        mask = sequence_mask(lens + 1).float()
+        mask = sequence_mask(lens + 1, max_len=seq_len + 1).float()
         trn_scr = trn_scr * mask
         score = trn_scr.sum(1).squeeze(-1)
 

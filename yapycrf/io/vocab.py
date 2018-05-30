@@ -167,4 +167,4 @@ class Vocab:
             The tensor of integers corresponding to the list of labels.
 
         """
-        return torch.Tensor([self.labels_stoi[lab] for lab in labs])
+        return torch.tensor([self.labels_stoi.get(lab, 0) for lab in labs])
