@@ -1,5 +1,3 @@
-allennlp
-torch
 torchtext
 pytest
 pytest-cov
