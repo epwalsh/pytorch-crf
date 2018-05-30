@@ -60,7 +60,7 @@ class Dataset:
             corresponding to a token in the sentence begins with the token,
             then a tab character, then the corresponding label.
 
-        vocab : :obj:`yapycrf.io.Vocab`.
+        vocab : yapycrf.io.Vocab
             The vocab instance to apply to the sentences.
 
         limit : int

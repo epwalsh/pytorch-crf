@@ -12,7 +12,7 @@ def sequence_mask(lens: torch.Tensor, max_len: int = None):
     Parameters
     ----------
     lens : torch.Tensor
-        Tensor of sequence lengths `[batch_size]`.
+        Tensor of sequence lengths ``[batch_size]``.
 
     max_len : int, optional (default: None)
         The maximum length (optional).
@@ -20,7 +20,7 @@ def sequence_mask(lens: torch.Tensor, max_len: int = None):
     Returns
     -------
     torch.ByteTensor
-        Returns a tensor of 1's and 0's of size `[batch_size x max_len]`.
+        Returns a tensor of 1's and 0's of size ``[batch_size x max_len]``.
 
     """
     batch_size = lens.size(0)

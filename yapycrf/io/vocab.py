@@ -66,7 +66,7 @@ class Vocab:
     pad_char : str
         The code to use for padding chars.
 
-    glove : :obj:`torchtext.vocab.GloVe`
+    glove : :obj:``torchtext.vocab.GloVe``
         GloVe word embeddings.
 
     chars_stoi : dict
@@ -135,16 +135,16 @@ class Vocab:
 
         Parameters
         ----------
-        sent : list of str
+        sent : List[str]
             The sentence to transform.
 
         Returns
         -------
-        tuple (list of :obj:`torch.Tensor`, :obj:`torch.Tensor`)
-            The first item is a list of length `len(sent)` of tensors, each of
-            which has size `[len(sent[i]) x self.n_chars]`.
+        Tuple[torch.Tensor, torch.Tensor]
+            The first item is a list of length ``len(sent)`` of tensors, each
+            of which has size ``[len(sent[i]) x self.n_chars]``.
             The second item has is a tensor of size
-            `[len(sent) x self.word_vec_dim]`.
+            ``[len(sent) x self.word_vec_dim]``.
 
         """
         char_tensors = []
@@ -171,7 +171,7 @@ class Vocab:
 
         Returns
         -------
-        :obj:`torch.Tensor`
+        torch.Tensor
             The tensor of integers corresponding to the list of labels.
 
         """

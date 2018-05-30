@@ -117,40 +117,40 @@ class Tagger(nn.Module):
         Parameters
         ----------
         chars : List[torch.Tensor]
-            List of tensors with shape `[word_lenth x n_chars]`.
+            List of tensors with shape ``[word_lenth x n_chars]``.
 
         words : torch.Tensor
             Pretrained word embeddings with shape
-            `[sent_length x word_emb_dim]`.
+            ``[sent_length x word_emb_dim]``.
 
         Returns
         -------
-        :obj:`Tensor`
-            `[batch_size x sent_length x crf.n_labels]`
+        torch.Tensor
+            ``[batch_size x sent_length x crf.n_labels]``
 
         """
         # Run each word character-by-character through the CharLSTM to generate
         # character-level word features.
-        # char_feats: `[sent_length x char_lstm.output_size]`
+        # char_feats: ``[sent_length x char_lstm.output_size]``
         char_feats = self.char_lstm(chars)
 
         # Concatenate the character-level word features and word embeddings.
-        # word_feats: `[sent_length x
-        #               (char_lstm.output_size + vocab.word_vec_dim)]`
+        # word_feats: ``[sent_length x
+        #                (char_lstm.output_size + vocab.word_vec_dim)]``
         word_feats = torch.cat([char_feats, words], dim=-1)
 
         # Add a fake batch dimension.
-        # word_feats: `[1 x sent_length x
-        #               (char_lstm.output_size + vocab.word_vec_dim)]`
+        # word_feats: ``[1 x sent_length x
+        #                (char_lstm.output_size + vocab.word_vec_dim)]``
         word_feats = word_feats.unsqueeze(0)
 
         # Run word features through the LSTM.
-        # lstm_feats: `[1 x sent_length x rnn_output_size]`
+        # lstm_feats: ``[1 x sent_length x rnn_output_size]``
         lstm_feats, _ = self.rnn(word_feats)
 
         # Run recurrent output through linear layer to generate the by-label
         # features.
-        # feats: `[1 x sent_length x crf.n_labels]`
+        # feats: ``[1 x sent_length x crf.n_labels]``
         feats = self.rnn_to_crf(lstm_feats)
 
         return feats
@@ -165,14 +165,14 @@ class Tagger(nn.Module):
         Parameters
         ----------
         chars : List[torch.Tensor]
-            List of tensors with shape `[word_lenth x n_chars]`.
+            List of tensors with shape ``[word_lenth x n_chars]``.
 
         words : torch.Tensor
             Pretrained word embeddings with shape
-            `[sent_length x word_emb_dim]`.
+            ``[sent_length x word_emb_dim]``.
 
         lens : torch.Tensor, optional (default: None)
-            Gives the length of each sentence in the batch `[batch_size]`.
+            Gives the length of each sentence in the batch ``[batch_size]``.
 
         Returns
         -------
@@ -186,7 +186,7 @@ class Tagger(nn.Module):
         mask = sequence_mask(lens)
 
         # Gather word feats.
-        # feats: `[1 x sent_length x n_labels]`
+        # feats: ``[1 x sent_length x n_labels]``
         feats = self._feats(chars, words)
 
         # Run features through Viterbi decode algorithm.
@@ -205,17 +205,17 @@ class Tagger(nn.Module):
         Parameters
         ----------
         chars : List[torch.Tensor]
-            List of tensors with shape `[word_lenth x n_chars]`.
+            List of tensors with shape ``[word_lenth x n_chars]``.
 
         words : torch.Tensor
             Pretrained word embeddings with shape
-            `[sent_length x word_emb_dim]`.
+            ``[sent_length x word_emb_dim]``.
 
         labs : torch.Tensor
-            Corresponding target label sequence with shape `[sent_length]`.
+            Corresponding target label sequence with shape ``[sent_length]``.
 
         lens : torch.Tensor, optional (default: None)
-            Gives the length of each sentence in the batch `[batch_size]`.
+            Gives the length of each sentence in the batch ``[batch_size]``.
 
         Returns
         -------
@@ -229,11 +229,11 @@ class Tagger(nn.Module):
         mask = sequence_mask(lens)
 
         # Fake batch dimension for labs.
-        # labs: `[1 x sent_length]`
+        # labs: ``[1 x sent_length]``
         labs = labs.unsqueeze(0)
 
         # Gather word feats.
-        # feats: `[1 x sent_length x n_labels]`
+        # feats: ``[1 x sent_length x n_labels]``
         feats = self._feats(chars, words)
 
         loglik = self.crf(feats, labs, mask=mask)

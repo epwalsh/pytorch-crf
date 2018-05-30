@@ -13,8 +13,8 @@ def main(args: List[str] = None) -> None:
     Parameters
     ----------
     args : List[str], optional (default: None)
-        A list of args to be passed to the `ArgumentParser`. This is only used
-        for testing.
+        A list of args to be passed to the ``ArgumentParser``. This is only
+        used for testing.
 
     Returns
     -------

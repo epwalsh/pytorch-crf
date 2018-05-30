@@ -35,7 +35,7 @@ class CharLSTM(nn.Module):
 
     output_size : int
         The dimension of the output, which is
-        `layers * hidden_size * directions`.
+        ``layers * hidden_size * directions``.
 
     rnn : torch.nn
         The LSTM layer.
@@ -69,13 +69,13 @@ class CharLSTM(nn.Module):
         Parameters
         ----------
         inputs : List[torch.Tensor]
-            List of tensors of shape `[word_length x n_chars]`.
+            List of tensors of shape ``[word_length x n_chars]``.
 
         Returns
         -------
         torch.Tensor
             The last hidden states:
-            `[len(inputs) x (layers * directions * hidden_size)]`
+            ``[len(inputs) x (layers * directions * hidden_size)]``
 
         """
         # pylint: disable=arguments-differ
@@ -83,20 +83,20 @@ class CharLSTM(nn.Module):
         for word in inputs:
             _, state = self.rnn(word.unsqueeze(0))
 
-            # `[(layers x directions) x 1 x hidden_size]`
+            # ``[(layers x directions) x 1 x hidden_size]``
             hidden = state[0]
 
             # Get rid of batch_size dimension.
-            # `[(layers x directions) x hidden_size]`
+            # ``[(layers x directions) x hidden_size]``
             hidden = hidden.squeeze()
 
             # Concatenate forward/backward hidden states.
-            # Changes to `[1 x (layers x directions x hidden_size)]`.
+            # Changes to ``[1 x (layers x directions x hidden_size)]``.
             hidden = hidden.view(-1).unsqueeze(0)
 
             hiddens.append(hidden)
 
-        # `[words x (layers x directions x hidden_size)]`
+        # ``[words x (layers x directions x hidden_size)]``
         hiddens = torch.cat(hiddens, dim=0)
 
         return hiddens
