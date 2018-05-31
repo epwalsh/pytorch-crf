@@ -82,21 +82,21 @@ class CharLSTM(nn.Module):
         hiddens = []
         for word in inputs:
             _, state = self.rnn(word.unsqueeze(0))
-
-            # ``[(layers x directions) x 1 x hidden_size]``
             hidden = state[0]
+            # hidden: ``[(layers * directions) x 1 x hidden_size]``
 
             # Get rid of batch_size dimension.
-            # ``[(layers x directions) x hidden_size]``
             hidden = hidden.squeeze()
+            # hidden: ``[(layers * directions) x hidden_size]``
 
             # Concatenate forward/backward hidden states.
-            # Changes to ``[1 x (layers x directions x hidden_size)]``.
             hidden = hidden.view(-1).unsqueeze(0)
+            # hidden: ``[1 x (layers * directions * hidden_size)]``.
 
             hiddens.append(hidden)
 
-        # ``[words x (layers x directions x hidden_size)]``
+        # Concat list into tensor.
         hiddens = torch.cat(hiddens, dim=0)
+        # hiddens: ``[words x (layers * directions * hidden_size)]``
 
         return hiddens
