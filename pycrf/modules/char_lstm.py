@@ -19,13 +19,13 @@ class CharLSTM(nn.Module):
     hidden_size : int
         The number of features in the hidden state of the LSTM cells.
 
-    bidirectional : bool
+    bidirectional : bool, optional (default: True)
         If true, becomes a bidirectional LSTM.
 
-    layers : int
+    layers : int, optional (default: 1)
         The number of cell layers.
 
-    dropout : float
+    dropout : float, optional (default: 0.)
         The dropout probability for the recurrent layer.
 
     Attributes
@@ -35,9 +35,9 @@ class CharLSTM(nn.Module):
 
     output_size : int
         The dimension of the output, which is
-        `layers * hidden_size * directions`.
+        ``layers * hidden_size * directions``.
 
-    rnn : :obj:`torch.nn`
+    rnn : torch.nn
         The LSTM layer.
 
     """
@@ -68,35 +68,35 @@ class CharLSTM(nn.Module):
 
         Parameters
         ----------
-        inputs : list of :obj:`torch.Tensor`
-            List of tensors of shape `[word_length x n_chars]`.
+        inputs : List[torch.Tensor]
+            List of tensors of shape ``[word_length x n_chars]``.
 
         Returns
         -------
-        :obj:`torch.Tensor`
+        torch.Tensor
             The last hidden states:
-            `[len(inputs) x (layers * directions * hidden_size)]`
+            ``[len(inputs) x (layers * directions * hidden_size)]``
 
         """
         # pylint: disable=arguments-differ
         hiddens = []
         for word in inputs:
             _, state = self.rnn(word.unsqueeze(0))
-
-            # `[(layers x directions) x 1 x hidden_size]`
             hidden = state[0]
+            # hidden: ``[(layers * directions) x 1 x hidden_size]``
 
             # Get rid of batch_size dimension.
-            # `[(layers x directions) x hidden_size]`
             hidden = hidden.squeeze()
+            # hidden: ``[(layers * directions) x hidden_size]``
 
             # Concatenate forward/backward hidden states.
-            # Changes to `[1 x (layers x directions x hidden_size)]`.
             hidden = hidden.view(-1).unsqueeze(0)
+            # hidden: ``[1 x (layers * directions * hidden_size)]``.
 
             hiddens.append(hidden)
 
-        # `[words x (layers x directions x hidden_size)]`
+        # Concat list into tensor.
         hiddens = torch.cat(hiddens, dim=0)
+        # hiddens: ``[words x (layers * directions * hidden_size)]``
 
         return hiddens

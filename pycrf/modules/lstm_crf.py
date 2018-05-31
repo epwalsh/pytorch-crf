@@ -1,64 +1,65 @@
 """Defines a Bi-LSMT CRF model."""
 
-from typing import List
+import argparse
+from typing import List, Tuple
 
 import torch
 import torch.nn as nn
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
-from yapycrf.io import Vocab
+from pycrf.io import Vocab
 from .utils import sequence_mask
 from .char_lstm import CharLSTM
 
 
-class Tagger(nn.Module):
+class LSTMCRF(nn.Module):
     """
-    Bi-LSTM CRF model.
+    (Bi-)LSTM CRF model.
 
     Parameters
     ----------
-    vocab : :obj:`yapycrf.io.Vocab`
+    vocab : pycrf.io.Vocab
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : :obj:`yapycrf.model.CharLSTM`
+    char_lstm : pycrf.model.CharLSTM
         The character-level LSTM layer.
 
-    crf : :obj:`yapycrf.model.crf`
+    crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
 
-    hidden_dim : int
+    hidden_dim : int, optional (default: 100)
         The hidden dimension of the recurrent layer.
 
-    layers : int
+    layers : int, optional (default: 1)
         The number of layers of cells in the recurrent layer.
 
-    dropout : float
+    dropout : float, optional (default: 0.)
         The dropout probability for the recurrent layer.
 
-    bidirectional : bool
+    bidirectional : bool, optional (default: True)
         If True, bidirectional recurrent layer is used, otherwise single
         direction.
 
     Attributes
     ----------
-    vocab : :obj:`yapycrf.io.Vocab`
+    vocab : pycrf.io.Vocab
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : :obj:`yapycrf.model.CharLSTM`
+    char_lstm : pycrf.model.CharLSTM
         The character-level LSTM layer.
 
-    crf : :obj:`yapycrf.model.crf`
+    crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
 
     rnn_output_size : int
         The output dimension of the recurrent layer.
 
-    rnn : :obj:`nn.Module`
+    rnn : nn.Module
         The recurrent layer of the network.
 
-    rnn_to_crf : :obj:`nn.Module`
+    rnn_to_crf : nn.Module
         The linear layer that maps the hidden states from the recurrent layer
         to the label space.
 
@@ -72,7 +73,7 @@ class Tagger(nn.Module):
                  layers: int = 1,
                  dropout: float = 0.,
                  bidirectional: bool = True) -> None:
-        super(Tagger, self).__init__()
+        super(LSTMCRF, self).__init__()
 
         assert vocab.n_chars == char_lstm.n_chars
         assert vocab.n_labels == crf.num_tags
@@ -116,81 +117,63 @@ class Tagger(nn.Module):
 
         Parameters
         ----------
-        chars : list of :obj:`torch.Tensor`
-            List of tensors with shape `[word_lenth x n_chars]`.
+        chars : List[torch.Tensor]
+            List of tensors with shape ``[word_lenth x n_chars]``.
 
-        words : :obj:`Tensor`
+        words : torch.Tensor
             Pretrained word embeddings with shape
-            `[sent_length x word_emb_dim]`.
+            ``[sent_length x word_emb_dim]``.
 
         Returns
         -------
-        :obj:`Tensor`
-            `[batch_size x sent_length x crf.n_labels]`
+        torch.Tensor
+            ``[batch_size x sent_length x crf.n_labels]``
 
         """
         # Run each word character-by-character through the CharLSTM to generate
         # character-level word features.
-        # char_feats: `[sent_length x char_lstm.output_size]`
         char_feats = self.char_lstm(chars)
+        # char_feats: ``[sent_length x char_lstm.output_size]``
 
         # Concatenate the character-level word features and word embeddings.
-        # word_feats: `[sent_length x
-        #               (char_lstm.output_size + vocab.word_vec_dim)]`
         word_feats = torch.cat([char_feats, words], dim=-1)
+        # word_feats: ``[sent_length x
+        #                (char_lstm.output_size + vocab.word_vec_dim)]``
 
         # Add a fake batch dimension.
-        # word_feats: `[1 x sent_length x
-        #               (char_lstm.output_size + vocab.word_vec_dim)]`
         word_feats = word_feats.unsqueeze(0)
+        # word_feats: ``[1 x sent_length x
+        #                (char_lstm.output_size + vocab.word_vec_dim)]``
 
         # Run word features through the LSTM.
-        # lstm_feats: `[1 x sent_length x rnn_output_size]`
         lstm_feats, _ = self.rnn(word_feats)
+        # lstm_feats: ``[1 x sent_length x rnn_output_size]``
 
         # Run recurrent output through linear layer to generate the by-label
         # features.
-        # feats: `[1 x sent_length x crf.n_labels]`
         feats = self.rnn_to_crf(lstm_feats)
+        # feats: ``[1 x sent_length x crf.n_labels]``
 
         return feats
-
-    def _score(self,
-               feats: torch.Tensor,
-               labs: torch.Tensor,
-               lens: torch.Tensor) -> torch.Tensor:
-        # Gather the score for each actual label.
-        # scores: `[batch_size x sent_length]`
-        scores = torch.gather(feats, 2, labs.unsqueeze(-1)).squeeze(-1)
-
-        # Apply mask.
-        mask = sequence_mask(lens).float()
-        scores = scores * mask
-
-        # Take sum over each sent.
-        # score: `[batch_size]`
-        score = scores.sum(1).squeeze(-1)
-
-        # Now add the transition score.
-        score = score + self.crf.transition_score(labs, lens)
-
-        return score
 
     def predict(self,
                 chars: List[torch.Tensor],
                 words: torch.Tensor,
-                lens: torch.Tensor = None) -> List[List[int]]:
+                lens: torch.Tensor = None) -> List[Tuple[List[int], float]]:
         """
-        Outputs the best tag sequence.
+        Compute the best tag sequence.
 
         Parameters
         ----------
-        chars : list of :obj:`Tensor`
-            List of tensors with shape `[word_lenth x n_chars]`.
+        chars : List[torch.Tensor]
+            List of tensors with shape ``[word_lenth x n_chars]``.
 
-        words : :obj:`Tensor`
+        words : torch.Tensor
             Pretrained word embeddings with shape
-            `[sent_length x word_emb_dim]`.
+            ``[sent_length x word_emb_dim]``.
+
+        lens : torch.Tensor, optional (default: None)
+            Gives the length of each sentence in the batch ``[batch_size]``.
 
         Returns
         -------
@@ -204,8 +187,8 @@ class Tagger(nn.Module):
         mask = sequence_mask(lens)
 
         # Gather word feats.
-        # feats: `[1 x sent_length x n_labels]`
         feats = self._feats(chars, words)
+        # feats: ``[1 x sent_length x n_labels]``
 
         # Run features through Viterbi decode algorithm.
         preds = self.crf.viterbi_tags(feats, mask)
@@ -218,23 +201,26 @@ class Tagger(nn.Module):
                 labs: torch.Tensor,
                 lens: torch.Tensor = None) -> torch.Tensor:
         """
-        Computes the negative of the log-likelihood.
+        Compute the negative of the log-likelihood.
 
         Parameters
         ----------
-        chars : list of :obj:`Tensor`
-            List of tensors with shape `[word_lenth x n_chars]`.
+        chars : List[torch.Tensor]
+            List of tensors with shape ``[word_lenth x n_chars]``.
 
-        words : :obj:`Tensor`
+        words : torch.Tensor
             Pretrained word embeddings with shape
-            `[sent_length x word_emb_dim]`.
+            ``[sent_length x word_emb_dim]``.
 
-        labs : :obj:`Tensor`
-            Corresponding target label sequence with shape `[sent_length]`.
+        labs : torch.Tensor
+            Corresponding target label sequence with shape ``[sent_length]``.
+
+        lens : torch.Tensor, optional (default: None)
+            Gives the length of each sentence in the batch ``[batch_size]``.
 
         Returns
         -------
-        :obj:`torch.Tensor`
+        torch.Tensor
             The negative log-likelihood evaluated at the inputs.
 
         """
@@ -244,13 +230,39 @@ class Tagger(nn.Module):
         mask = sequence_mask(lens)
 
         # Fake batch dimension for labs.
-        # labs: `[1 x sent_length]`
         labs = labs.unsqueeze(0)
+        # labs: ``[1 x sent_length]``
 
         # Gather word feats.
-        # feats: `[1 x sent_length x n_labels]`
         feats = self._feats(chars, words)
+        # feats: ``[1 x sent_length x n_labels]``
 
         loglik = self.crf(feats, labs, mask=mask)
 
         return -1. * loglik
+
+    @staticmethod
+    def cl_opts(parser: argparse.ArgumentParser) -> None:
+        """Define command-line options specific to this model."""
+        group = parser.add_argument_group("Bi-LSTM CRF options")
+        group.add_argument(
+            "--char_hidden_dim",
+            type=float,
+            default=50,
+            help="""Dimension of the hidden layer for the character-level
+            features LSTM."""
+        )
+        group.add_argument(
+            "--word_hidden_dim",
+            type=float,
+            default=50,
+            help="""Dimension of the hidden layer for the word-level
+            features LSTM."""
+        )
+
+    @classmethod
+    def cl_init(cls, opts: argparse.Namespace, vocab: Vocab):
+        """Initialize an instance of this model from command-line options."""
+        crf = ConditionalRandomField(vocab.n_labels)
+        char_lstm = CharLSTM(vocab.n_chars, opts.char_hidden_dim)
+        return cls(vocab, char_lstm, crf, hidden_dim=opts.word_hidden_dim)

@@ -1,26 +1,24 @@
-"""
-Small helper functions.
-"""
+"""Small helper functions."""
 
 import torch
 
 
-def sequence_mask(lens, max_len=None):
+def sequence_mask(lens: torch.Tensor, max_len: int = None) -> torch.ByteTensor:
     """
     Compute sequence mask.
 
     Parameters
     ----------
-    lens : :obj:`LongTensor`
-        Tensor of sequence lengths `[batch_size]`.
+    lens : torch.Tensor
+        Tensor of sequence lengths ``[batch_size]``.
 
-    max_len : int
+    max_len : int, optional (default: None)
         The maximum length (optional).
 
     Returns
     -------
-    :obj:`LongTensor`
-        Returns a tensor of 1's and 0's of size `[batch_size x max_len]`.
+    torch.ByteTensor
+        Returns a tensor of 1's and 0's of size ``[batch_size x max_len]``.
 
     """
     batch_size = lens.size(0)

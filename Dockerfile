@@ -1,4 +1,4 @@
-FROM python:3.5
+FROM python:3.6
 
 # Install some base packages.
 RUN apt-get update && \
@@ -14,4 +14,4 @@ COPY requirements.txt ./requirements.txt
 RUN pip3 install -r requirements.txt
 
 # Move application files into place.
-COPY yapycrf ./yapycrf/
+COPY pycrf ./pycrf/
