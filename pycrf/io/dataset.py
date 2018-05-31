@@ -32,6 +32,9 @@ class Dataset:
     def __len__(self) -> int:
         return len(self.source)
 
+    def __bool__(self) -> bool:
+        return len(self.source) > 0
+
     def append(self, src: SourceType, tgt: TargetType) -> None:
         """Append a new training example."""
         self.source.append(src)

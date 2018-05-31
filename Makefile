@@ -8,19 +8,20 @@ IMAGE_TAG      := python$(PYTHON_VERSION)
 help :
 	@echo \
 		"Commands:\n"\
-		"  lint: run pylint and pydocstyle on source files.\n"\
-		"  test: run pytest on the test/ directory."
+		"  lint:      runs pylint and pydocstyle on source files.\n"\
+		"  typecheck: runs mypy to statically check types.\n"\
+		"  test:      runs pytest on the test/ directory."
 
 .PHONY : typecheck
 typecheck :
-	-@mypy ./pycrf/ --ignore-missing-imports
+	-@mypy pycrf --ignore-missing-imports
 
 .PHONY : lint
 lint :
 	@echo "Lint (pydocstyle):\n"
-	-@pydocstyle --config=./.pydocstyle ./pycrf/*
+	-@pydocstyle --config=./.pydocstyle pycrf
 	@echo "\nLint (pylint):\n"
-	-@pylint --rcfile=./.pylintrc ./pycrf/*
+	-@pylint --rcfile=./.pylintrc -f colorized pycrf
 
 .PHONY : test
 test :

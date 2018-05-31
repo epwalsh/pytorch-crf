@@ -77,3 +77,9 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         type=str,
         help="""Path to vector cache."""
     )
+    group.add_argument(
+        "--epochs",
+        type=int,
+        default=10,
+        help="""The maximum number of epochs to train for."""
+    )
