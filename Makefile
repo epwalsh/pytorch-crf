@@ -17,7 +17,9 @@ typecheck :
 
 .PHONY : lint
 lint :
+	@echo "Running pydocstyle\n"
 	-@pydocstyle --config=./.pydocstyle ./pycrf/*
+	@echo "\nRunning pylint\n"
 	-@pylint --rcfile=./.pylintrc ./pycrf/*
 
 .PHONY : test

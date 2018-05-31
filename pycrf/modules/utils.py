@@ -1,11 +1,9 @@
-"""
-Small helper functions.
-"""
+"""Small helper functions."""
 
 import torch
 
 
-def sequence_mask(lens: torch.Tensor, max_len: int = None):
+def sequence_mask(lens: torch.Tensor, max_len: int = None) -> torch.ByteTensor:
     """
     Compute sequence mask.
 

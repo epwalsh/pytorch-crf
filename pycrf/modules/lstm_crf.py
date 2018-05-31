@@ -161,7 +161,7 @@ class LSTMCRF(nn.Module):
                 words: torch.Tensor,
                 lens: torch.Tensor = None) -> List[List[int]]:
         """
-        Outputs the best tag sequence.
+        Compute the best tag sequence.
 
         Parameters
         ----------
@@ -201,7 +201,7 @@ class LSTMCRF(nn.Module):
                 labs: torch.Tensor,
                 lens: torch.Tensor = None) -> torch.Tensor:
         """
-        Computes the negative of the log-likelihood.
+        Compute the negative of the log-likelihood.
 
         Parameters
         ----------
@@ -243,7 +243,7 @@ class LSTMCRF(nn.Module):
 
     @staticmethod
     def cl_opts(parser: argparse.ArgumentParser) -> None:
-        """Defines command-line options specific to this model."""
+        """Define command-line options specific to this model."""
         group = parser.add_argument_group("Bi-LSTM CRF options")
         group.add_argument(
             "--char_hidden_dim",
@@ -262,7 +262,7 @@ class LSTMCRF(nn.Module):
 
     @classmethod
     def cl_init(cls, opts: argparse.Namespace, vocab: Vocab):
-        """Initializes an instance of this model from command-line options."""
+        """Initialize an instance of this model from command-line options."""
         crf = ConditionalRandomField(vocab.n_labels)
         char_lstm = CharLSTM(vocab.n_chars, opts.char_hidden_dim)
         return cls(vocab, char_lstm, crf, hidden_dim=opts.word_hidden_dim)

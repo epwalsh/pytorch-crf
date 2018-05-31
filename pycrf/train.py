@@ -1,6 +1,5 @@
 """
 Train models from the command line.
------------------------------------
 
 The training script itself is invoked with:
 
@@ -25,7 +24,7 @@ from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
 
 def main(args: List[str] = None) -> None:
     """
-    Function to be run when script is invoked.
+    Parse command-line options and train model.
 
     Parameters
     ----------

@@ -11,7 +11,7 @@ MODEL_ALIASES = {
 
 
 def help_opts(parser: argparse.ArgumentParser) -> None:
-    """Help options."""
+    """Add help options."""
     group = parser.add_argument_group("Reference options")
     group.add_argument(
         "-h", "--help",
@@ -22,6 +22,8 @@ def help_opts(parser: argparse.ArgumentParser) -> None:
 
 def base_opts(parser: argparse.ArgumentParser) -> None:
     """
+    Add base command-line options.
+
     These options are are available regardless of task or the model being
     trained.
     """
@@ -41,7 +43,7 @@ def base_opts(parser: argparse.ArgumentParser) -> None:
 
 
 def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
-    """Options specific to a training task."""
+    """Add options specific to a training task."""
     group = parser.add_argument_group("Training options")
     group.add_argument(
         "--train",
