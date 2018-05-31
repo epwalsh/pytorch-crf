@@ -1,10 +1,10 @@
-"""Tests for yapycrf.modules.utils methods."""
+"""Tests for pycrf.modules.utils methods."""
 
 import pytest
 
 import torch
 
-from yapycrf.modules.utils import sequence_mask
+from pycrf.modules.utils import sequence_mask
 
 
 cases = [

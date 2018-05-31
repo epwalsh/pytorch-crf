@@ -6,8 +6,8 @@ import argparse
 import torch.nn as nn
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
-from yapycrf.io import Vocab
-from yapycrf.modules import CharLSTM, Tagger
+from pycrf.io import Vocab
+from pycrf.modules import CharLSTM, Tagger
 
 
 class Trainable(ABC):

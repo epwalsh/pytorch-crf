@@ -6,13 +6,13 @@ The training script itself is invoked with:
 
 .. code-block:: bash
 
-  python -m yapycrf.train
+  python -m pycrf.train
 
 You can see all of the options available for training a specific model with:
 
 .. code-block:: bash
 
-  python -m yapycrf.train --help --model MODEL_NAME
+  python -m pycrf.train --help --model MODEL_NAME
 
 """
 

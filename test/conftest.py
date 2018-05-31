@@ -3,9 +3,9 @@
 import pytest
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
-from yapycrf.io.dataset import Dataset
-from yapycrf.io.vocab import Vocab
-from yapycrf.modules import CharLSTM, Tagger
+from pycrf.io.dataset import Dataset
+from pycrf.io.vocab import Vocab
+from pycrf.modules import CharLSTM, Tagger
 
 
 LABELS = ["O", "B-NAME", "I-NAME"]

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
-from yapycrf.io import Vocab
+from pycrf.io import Vocab
 from .utils import sequence_mask
 from .char_lstm import CharLSTM
 
@@ -17,11 +17,11 @@ class Tagger(nn.Module):
 
     Parameters
     ----------
-    vocab : yapycrf.io.Vocab
+    vocab : pycrf.io.Vocab
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : yapycrf.model.CharLSTM
+    char_lstm : pycrf.model.CharLSTM
         The character-level LSTM layer.
 
     crf : allennlp.modules.conditional_random_field.ConditionalRandomField
@@ -42,11 +42,11 @@ class Tagger(nn.Module):
 
     Attributes
     ----------
-    vocab : yapycrf.io.Vocab
+    vocab : pycrf.io.Vocab
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : yapycrf.model.CharLSTM
+    char_lstm : pycrf.model.CharLSTM
         The character-level LSTM layer.
 
     crf : allennlp.modules.conditional_random_field.ConditionalRandomField

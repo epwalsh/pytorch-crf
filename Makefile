@@ -13,16 +13,16 @@ help :
 
 .PHONY : typecheck
 typecheck :
-	-@mypy ./yapycrf/ --ignore-missing-imports
+	-@mypy ./pycrf/ --ignore-missing-imports
 
 .PHONY : lint
 lint :
-	-@pydocstyle --config=./.pydocstyle ./yapycrf/*
-	-@pylint --rcfile=./.pylintrc ./yapycrf/*
+	-@pydocstyle --config=./.pydocstyle ./pycrf/*
+	-@pylint --rcfile=./.pylintrc ./pycrf/*
 
 .PHONY : test
 test :
-	@export PYTHONPATH=. && pytest --cov=yapycrf $(test)
+	@export PYTHONPATH=. && pytest --cov=pycrf $(test)
 
 .PHONY : create-branch
 create-branch :
