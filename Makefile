@@ -17,14 +17,15 @@ typecheck :
 
 .PHONY : lint
 lint :
-	@echo "Running pydocstyle\n"
+	@echo "Lint (pydocstyle):\n"
 	-@pydocstyle --config=./.pydocstyle ./pycrf/*
-	@echo "\nRunning pylint\n"
+	@echo "\nLint (pylint):\n"
 	-@pylint --rcfile=./.pylintrc ./pycrf/*
 
 .PHONY : test
 test :
-	@export PYTHONPATH=. && pytest --cov=pycrf $(test)
+	@echo "Unit tests (pytest):"
+	@export PYTHONPATH=. && pytest --color=yes -v --cov=pycrf $(test)
 
 .PHONY : create-branch
 create-branch :

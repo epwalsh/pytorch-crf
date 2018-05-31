@@ -1,7 +1,7 @@
 """Defines a Bi-LSMT CRF model."""
 
 import argparse
-from typing import List
+from typing import List, Tuple
 
 import torch
 import torch.nn as nn
@@ -159,7 +159,7 @@ class LSTMCRF(nn.Module):
     def predict(self,
                 chars: List[torch.Tensor],
                 words: torch.Tensor,
-                lens: torch.Tensor = None) -> List[List[int]]:
+                lens: torch.Tensor = None) -> List[Tuple[List[int], float]]:
         """
         Compute the best tag sequence.
 

@@ -14,16 +14,17 @@ def test_feats(lstm_crf, dataset):
 def test_predict(lstm_crf, dataset):
     """Test `Tagger.predict()` method."""
     for src, _ in dataset:
-        res = lstm_crf.predict(*src)
+        preds = lstm_crf.predict(*src)
         # Just get first batch since there is only one.
-        res = res[0]
+        preds = preds[0]
+        tags, _ = preds
 
         # Output sequence should be same length as input sequence.
-        assert len(res) == len(src[0])
+        assert len(tags) == len(src[0])
 
         # Each lab index should represent an actual label, i.e. it should be
         # in the set `{0, ..., n_labels - 1}`.
-        for lab_idx in res:
+        for lab_idx in tags:
             assert lab_idx in lstm_crf.vocab.labels_itos
 
 
