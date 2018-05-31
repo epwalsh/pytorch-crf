@@ -1,20 +1,20 @@
-"""Tests for yapycrf.modules.Tagger methods."""
+"""Tests for pycrf.modules.LSTMCRF methods."""
 
 
-def test_feats(tagger, dataset):
+def test_feats(lstm_crf, dataset):
     """Test `Tagger._feats()` method."""
     for src, _ in dataset:
-        res = tagger._feats(*src)
+        res = lstm_crf._feats(*src)
         batch_size, sent_length, n_labels = res.size()
         assert batch_size == 1
         assert sent_length == len(src[0])
-        assert n_labels == tagger.vocab.n_labels
+        assert n_labels == lstm_crf.vocab.n_labels
 
 
-def test_predict(tagger, dataset):
+def test_predict(lstm_crf, dataset):
     """Test `Tagger.predict()` method."""
     for src, _ in dataset:
-        res = tagger.predict(*src)
+        res = lstm_crf.predict(*src)
         # Just get first batch since there is only one.
         res = res[0]
 
@@ -24,10 +24,10 @@ def test_predict(tagger, dataset):
         # Each lab index should represent an actual label, i.e. it should be
         # in the set `{0, ..., n_labels - 1}`.
         for lab_idx in res:
-            assert lab_idx in tagger.vocab.labels_itos
+            assert lab_idx in lstm_crf.vocab.labels_itos
 
 
-def test_forward(tagger, dataset):
+def test_forward(lstm_crf, dataset):
     """Test `Tagger.forward()` method."""
     for src, tgt in dataset:
-        tagger.forward(*src, tgt)
+        lstm_crf.forward(*src, tgt)

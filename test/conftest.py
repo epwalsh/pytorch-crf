@@ -5,7 +5,7 @@ import pytest
 from allennlp.modules.conditional_random_field import ConditionalRandomField
 from pycrf.io.dataset import Dataset
 from pycrf.io.vocab import Vocab
-from pycrf.modules import CharLSTM, Tagger
+from pycrf.modules import CharLSTM, LSTMCRF
 
 
 LABELS = ["O", "B-NAME", "I-NAME"]
@@ -34,5 +34,5 @@ def char_lstm(vocab):
 
 
 @pytest.fixture(scope="session")
-def tagger(vocab, char_lstm, crf):
-    return Tagger(vocab, char_lstm, crf, hidden_dim=50)
+def lstm_crf(vocab, char_lstm, crf):
+    return LSTMCRF(vocab, char_lstm, crf, hidden_dim=50)

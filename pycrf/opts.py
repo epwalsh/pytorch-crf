@@ -2,6 +2,13 @@
 
 import argparse
 
+from .modules import LSTMCRF
+
+
+MODEL_ALIASES = {
+    "lstm_crf": LSTMCRF,
+}
+
 
 def help_opts(parser: argparse.ArgumentParser) -> None:
     """Help options."""
@@ -26,9 +33,9 @@ def base_opts(parser: argparse.ArgumentParser) -> None:
     )
     group.add_argument(
         "-m", "--model",
-        default="bilstm_crf",
+        default="lstm_crf",
         type=str,
-        choices=["bilstm_crf"],
+        choices=list(MODEL_ALIASES.keys()),
         help="""The model to use."""
     )
 

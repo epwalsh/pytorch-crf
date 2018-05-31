@@ -1,5 +1,6 @@
 """Defines a Bi-LSMT CRF model."""
 
+import argparse
 from typing import List
 
 import torch
@@ -11,9 +12,9 @@ from .utils import sequence_mask
 from .char_lstm import CharLSTM
 
 
-class Tagger(nn.Module):
+class LSTMCRF(nn.Module):
     """
-    Bi-LSTM CRF model.
+    (Bi-)LSTM CRF model.
 
     Parameters
     ----------
@@ -72,7 +73,7 @@ class Tagger(nn.Module):
                  layers: int = 1,
                  dropout: float = 0.,
                  bidirectional: bool = True) -> None:
-        super(Tagger, self).__init__()
+        super(LSTMCRF, self).__init__()
 
         assert vocab.n_chars == char_lstm.n_chars
         assert vocab.n_labels == crf.num_tags
@@ -239,3 +240,29 @@ class Tagger(nn.Module):
         loglik = self.crf(feats, labs, mask=mask)
 
         return -1. * loglik
+
+    @staticmethod
+    def cl_opts(parser: argparse.ArgumentParser) -> None:
+        """Defines command-line options specific to this model."""
+        group = parser.add_argument_group("Bi-LSTM CRF options")
+        group.add_argument(
+            "--char_hidden_dim",
+            type=float,
+            default=50,
+            help="""Dimension of the hidden layer for the character-level
+            features LSTM."""
+        )
+        group.add_argument(
+            "--word_hidden_dim",
+            type=float,
+            default=50,
+            help="""Dimension of the hidden layer for the word-level
+            features LSTM."""
+        )
+
+    @classmethod
+    def cl_init(cls, opts: argparse.Namespace, vocab: Vocab):
+        """Initializes an instance of this model from command-line options."""
+        crf = ConditionalRandomField(vocab.n_labels)
+        char_lstm = CharLSTM(vocab.n_chars, opts.char_hidden_dim)
+        return cls(vocab, char_lstm, crf, hidden_dim=opts.word_hidden_dim)

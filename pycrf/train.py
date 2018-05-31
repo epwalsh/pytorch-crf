@@ -20,8 +20,7 @@ import argparse
 from typing import List
 
 from .io import Vocab, Dataset
-from .models import MODEL_ALIASES
-from .opts import help_opts, base_opts, train_opts
+from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
 
 
 def main(args: List[str] = None) -> None:
