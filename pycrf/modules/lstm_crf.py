@@ -8,7 +8,7 @@ import torch.nn as nn
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
 from pycrf.io import Vocab
-from .utils import sequence_mask
+from pycrf.nn.utils import sequence_mask
 from .char_lstm import CharLSTM
 
 
@@ -105,8 +105,10 @@ class LSTMCRF(nn.Module):
         self.rnn_to_crf = nn.Linear(self.rnn_output_size, self.vocab.n_labels)
 
     def _feats(self,
-               chars: List[torch.Tensor],
-               words: torch.Tensor) -> torch.Tensor:
+               words: torch.Tensor,
+               word_lengths: torch.Tensor,
+               word_indices: torch.Tensor,
+               word_embs: torch.Tensor) -> torch.Tensor:
         """
         Generate features for the CRF from input.
 
@@ -117,10 +119,18 @@ class LSTMCRF(nn.Module):
 
         Parameters
         ----------
-        chars : List[torch.Tensor]
-            List of tensors with shape ``[word_lenth x n_chars]``.
-
         words : torch.Tensor
+            Word tensors ``[sent_length x max_word_lenth x n_chars]``.
+
+        word_lengths : torch.Tensor
+            Contains the length of each word (in characters), with shape
+            ``[sent_length]``.
+
+        word_indices : torch.Tensor
+            Contains sorted indices of words by length, with shape
+            ``[sent_length]``.
+
+        word_embs : torch.Tensor
             Pretrained word embeddings with shape
             ``[sent_length x word_emb_dim]``.
 
@@ -132,11 +142,11 @@ class LSTMCRF(nn.Module):
         """
         # Run each word character-by-character through the CharLSTM to generate
         # character-level word features.
-        char_feats = self.char_lstm(chars)
+        char_feats = self.char_lstm(words, word_lengths, word_indices)
         # char_feats: ``[sent_length x char_lstm.output_size]``
 
         # Concatenate the character-level word features and word embeddings.
-        word_feats = torch.cat([char_feats, words], dim=-1)
+        word_feats = torch.cat([char_feats, word_embs], dim=-1)
         # word_feats: ``[sent_length x
         #                (char_lstm.output_size + vocab.word_vec_dim)]``
 
@@ -157,18 +167,28 @@ class LSTMCRF(nn.Module):
         return feats
 
     def predict(self,
-                chars: List[torch.Tensor],
                 words: torch.Tensor,
+                word_lengths: torch.Tensor,
+                word_indices: torch.Tensor,
+                word_embs: torch.Tensor,
                 lens: torch.Tensor = None) -> List[Tuple[List[int], float]]:
         """
         Compute the best tag sequence.
 
         Parameters
         ----------
-        chars : List[torch.Tensor]
-            List of tensors with shape ``[word_lenth x n_chars]``.
-
         words : torch.Tensor
+            Word tensors ``[sent_length x max_word_lenth x n_chars]``.
+
+        word_lengths : torch.Tensor
+            Contains the length of each word (in characters), with shape
+            ``[sent_length]``.
+
+        word_indices : torch.Tensor
+            Contains sorted indices of words by length, with shape
+            ``[sent_length]``.
+
+        word_embs : torch.Tensor
             Pretrained word embeddings with shape
             ``[sent_length x word_emb_dim]``.
 
@@ -187,7 +207,7 @@ class LSTMCRF(nn.Module):
         mask = sequence_mask(lens)
 
         # Gather word feats.
-        feats = self._feats(chars, words)
+        feats = self._feats(words, word_lengths, word_indices, word_embs)
         # feats: ``[1 x sent_length x n_labels]``
 
         # Run features through Viterbi decode algorithm.
@@ -196,8 +216,10 @@ class LSTMCRF(nn.Module):
         return preds
 
     def forward(self,
-                chars: List[torch.Tensor],
                 words: torch.Tensor,
+                word_lengths: torch.Tensor,
+                word_indices: torch.Tensor,
+                word_embs: torch.Tensor,
                 labs: torch.Tensor,
                 lens: torch.Tensor = None) -> torch.Tensor:
         """
@@ -205,10 +227,18 @@ class LSTMCRF(nn.Module):
 
         Parameters
         ----------
-        chars : List[torch.Tensor]
-            List of tensors with shape ``[word_lenth x n_chars]``.
-
         words : torch.Tensor
+            Word tensors ``[sent_length x max_word_lenth x n_chars]``.
+
+        word_lengths : torch.Tensor
+            Contains the length of each word (in characters), with shape
+            ``[sent_length]``.
+
+        word_indices : torch.Tensor
+            Contains sorted indices of words by length, with shape
+            ``[sent_length]``.
+
+        word_embs : torch.Tensor
             Pretrained word embeddings with shape
             ``[sent_length x word_emb_dim]``.
 
@@ -234,7 +264,7 @@ class LSTMCRF(nn.Module):
         # labs: ``[1 x sent_length]``
 
         # Gather word feats.
-        feats = self._feats(chars, words)
+        feats = self._feats(words, word_lengths, word_indices, word_embs)
         # feats: ``[1 x sent_length x n_labels]``
 
         loglik = self.crf(feats, labs, mask=mask)

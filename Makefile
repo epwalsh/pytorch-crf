@@ -23,10 +23,13 @@ lint :
 	@echo "\nLint (pylint):\n"
 	-@pylint --rcfile=./.pylintrc -f colorized pycrf
 
-.PHONY : test
-test :
+.PHONY : unit-test
+unit-test :
 	@echo "Unit tests (pytest):"
 	@export PYTHONPATH=. && pytest --color=yes -v --cov=pycrf $(test)
+
+.PHONY : test
+test : typecheck lint unit-test
 
 .PHONY : create-branch
 create-branch :

@@ -2,6 +2,8 @@
 
 import torch
 
+from pycrf.nn.utils import assert_equal
+
 
 def test_size(dataset):
     """Make sure the right number of sentences were loaded."""
@@ -14,22 +16,22 @@ def test_source(dataset, vocab):
 
     # Check the first item, which comes from the sentence:
     # [("hi", "O"), ("there", "O")]
-    assert isinstance(dataset.source[0], tuple)
-    assert isinstance(dataset.source[0][0], list)
-    assert isinstance(dataset.source[0][1], torch.Tensor)
-    assert len(dataset.source[0][0]) == 2
-    assert dataset.source[0][0][0].size()[0] == 2
-    assert dataset.source[0][0][0].size()[1] == vocab.n_chars
+    words, word_lens, word_idxs, word_embs = dataset.source[0]
+    assert isinstance(words, torch.Tensor)
+    assert isinstance(word_lens, torch.Tensor)
+    assert isinstance(word_idxs, torch.Tensor)
+    assert isinstance(word_embs, torch.Tensor)
+
+    assert list(words.size()) == [2, 5, vocab.n_chars]
+    assert_equal(word_lens, torch.tensor([5, 2]))
+    assert_equal(word_idxs, torch.tensor([1, 0]))
+    assert list(word_embs.size()) == [2, vocab.word_vec_dim]
 
 
 def test_target(dataset, vocab):
     """Make sure the `target` attr contains what we expect."""
     assert len(dataset.target) == 4
-    assert (dataset.target[0] == torch.tensor([0, 0])).all()\
-        .item() == 1
-    assert (dataset.target[1] == torch.tensor([0, 0, 0, 1]))\
-        .all().item() == 1
-    assert (dataset.target[2] == torch.tensor([0, 0, 1, 2]))\
-        .all().item() == 1
-    assert (dataset.target[3] == torch.tensor([0]))\
-        .all().item() == 1
+    assert_equal(dataset.target[0], torch.tensor([0, 0]))
+    assert_equal(dataset.target[1], torch.tensor([0, 0, 0, 1]))
+    assert_equal(dataset.target[2], torch.tensor([0, 0, 1, 2]))
+    assert_equal(dataset.target[3], torch.tensor([0]))

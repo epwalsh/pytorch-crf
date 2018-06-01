@@ -129,7 +129,7 @@ class Vocab:
         return len(self.labels_itos)
 
     def sent2tensor(self,
-                    sent: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
+                    sent: List[str]) -> Tuple[List[torch.Tensor], torch.Tensor, torch.Tensor]:
         """
         Transform a sentence into a tensor.
 
@@ -140,16 +140,21 @@ class Vocab:
 
         Returns
         -------
-        Tuple[torch.Tensor, torch.Tensor]
-            The first item is a list of length ``len(sent)`` of tensors, each
-            of which has size ``[len(sent[i]) x self.n_chars]``.
-            The second item has is a tensor of size
-            ``[len(sent) x self.word_vec_dim]``.
+        Tuple[List[torch.Tensor], torch.Tensor, torch.Tensor]
+            The first item is a list of word tensors, each of has shape
+            ``[word_length x self.n_chars]``.
+            The second item is a tensor holding the original lengths of the
+            words. The third item has is a tensor of size
+            ``[len(sent) x self.word_vec_dim]``, representing the word
+            embeddings for each word.
 
         """
+        # pylint: disable=not-callable
         char_tensors = []
+        word_lengths = []
         word_tensors = []
         for tok in sent:
+            word_lengths.append(len(tok))
             word_tensors.append(
                 self.glove[self.glove.stoi.get(tok.lower(), -1)])
             tmp_list = []
@@ -158,7 +163,9 @@ class Vocab:
                 tmp[self.chars_stoi.get(char, 0)] = 1
                 tmp_list.append(tmp.view(1, -1))
             char_tensors.append(torch.cat(tmp_list))
-        return char_tensors, torch.cat(word_tensors, dim=0)
+        return (char_tensors,
+                torch.tensor(word_lengths),
+                torch.cat(word_tensors, dim=0))
 
     def labs2tensor(self, labs: List[str]) -> torch.Tensor:
         """
