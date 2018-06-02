@@ -5,13 +5,14 @@ from typing import List, Tuple, Generator, Type
 
 import torch
 
+from pycrf.nn.utils import sort_and_pad
 from .vocab import Vocab
 
 
 logger = logging.getLogger(__name__)
 
 
-SourceType = Tuple[List[torch.Tensor], torch.Tensor]
+SourceType = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 TargetType = Type[torch.Tensor]
 
 
@@ -81,10 +82,19 @@ class Dataset:
             for line in datafile.readlines():
                 line_list = line.rstrip().split('\t')
                 if len(line_list) == 1:  # end of sentence.
-                    char_tensors, word_tensors = vocab.sent2tensor(src)
+                    # Get target tensor.
                     target_tensor = vocab.labs2tensor(tgt)
-                    self.source.append((char_tensors, word_tensors))
                     self.target.append(target_tensor)
+
+                    # Get source tensors.
+                    char_tensors, word_lengths, word_tensors = \
+                        vocab.sent2tensor(src)
+                    # ``char_tensors`` is a list. Sort and pad to turn it into
+                    # a single tensor.
+                    sorted_char_tensors, lens, idxs = \
+                        sort_and_pad(char_tensors, word_lengths)
+                    self.source.append((sorted_char_tensors, lens, idxs, word_tensors))
+
                     src = []
                     tgt = []
                     i += 1

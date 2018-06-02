@@ -44,7 +44,7 @@ cases = [
 @pytest.mark.parametrize("sent", cases)
 def test_sent2tensor(vocab, sent):
     """Check that Vocab.sent2tensor has the correct output format."""
-    char_tensors, word_tensors = vocab.sent2tensor(sent)
+    char_tensors, word_lengths, word_tensors = vocab.sent2tensor(sent)
     assert isinstance(char_tensors, list)
     assert len(char_tensors) == len(sent)
     assert isinstance(word_tensors, torch.Tensor)

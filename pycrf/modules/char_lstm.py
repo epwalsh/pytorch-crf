@@ -1,10 +1,11 @@
 """Implements a character-sequence LSTM to generate words features."""
 
-from typing import List
-
 import torch
 import torch.nn as nn
 from torch.nn import LSTM
+from torch.nn.utils.rnn import pack_padded_sequence
+
+from pycrf.nn.utils import unsort
 
 
 class CharLSTM(nn.Module):
@@ -62,14 +63,24 @@ class CharLSTM(nn.Module):
                         dropout=dropout,
                         bidirectional=bidirectional)
 
-    def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
+    def forward(self,
+                inputs: torch.Tensor,
+                lengths: torch.Tensor,
+                indices: torch.Tensor) -> torch.Tensor:
         """
         Make a forward pass through the network.
 
         Parameters
         ----------
-        inputs : List[torch.Tensor]
-            List of tensors of shape ``[word_length x n_chars]``.
+        inputs : torch.Tensor
+            Tensor of shape ``[sent_length x word_length x n_chars]``.
+
+        lengths : torch.Tensor
+            The length of each word ``[sent_length]``.
+
+        indices : torch.Tensor
+            Sorted indices that we can recover the unsorted final hidden
+            states.
 
         Returns
         -------
@@ -79,24 +90,20 @@ class CharLSTM(nn.Module):
 
         """
         # pylint: disable=arguments-differ
-        hiddens = []
-        for word in inputs:
-            _, state = self.rnn(word.unsqueeze(0))
-            hidden = state[0]
-            # hidden: ``[(layers * directions) x 1 x hidden_size]``
+        sent_length = inputs.size()[0]
 
-            # Get rid of batch_size dimension.
-            hidden = hidden.squeeze()
-            # hidden: ``[(layers * directions) x hidden_size]``
+        packed = pack_padded_sequence(inputs, lengths, batch_first=True)
 
-            # Concatenate forward/backward hidden states.
-            hidden = hidden.view(-1).unsqueeze(0)
-            # hidden: ``[1 x (layers * directions * hidden_size)]``.
+        _, state = self.rnn(packed)
+        hidden = state[0]
+        # hidden: ``[(layers * directions) x sent_length x hidden_size]``
 
-            hiddens.append(hidden)
+        # Move sentence dimension to the first dimension and then
+        # concatenate the forward/backward hidden states.
+        hidden = hidden.permute(1, 0, 2).contiguous().view(sent_length, -1)
+        # hidden: ``[sent_length x (layers * directions * hidden_size)]``
 
-        # Concat list into tensor.
-        hiddens = torch.cat(hiddens, dim=0)
-        # hiddens: ``[words x (layers * directions * hidden_size)]``
+        # Unsort the hidden states.
+        hidden = unsort(hidden, indices)
 
-        return hiddens
+        return hidden
