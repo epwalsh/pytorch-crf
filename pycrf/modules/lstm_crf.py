@@ -256,7 +256,7 @@ class LSTMCRF(nn.Module):
         """
         # pylint: disable=arguments-differ,not-callable
         if lens is None:
-            lens = torch.tensor([words.size(0)])
+            lens = torch.tensor([words.size(0)], device=words.device)
         mask = sequence_mask(lens)
 
         # Fake batch dimension for labs.

@@ -35,8 +35,10 @@ def train(opts: argparse.Namespace,
 
     # Loop through epochs.
     for epoch in range(opts.epochs):
-        print("Epoch {:d}".format(epoch))
+        print("Epoch {:d}".format(epoch + 1))
+        i = 0
         total_loss = 0.
+        running_loss = 0.
         for src, tgt in dataset_train:
             # Zero out the gradient.
             model.zero_grad()
@@ -44,12 +46,22 @@ def train(opts: argparse.Namespace,
             # Compute the loss.
             loss = model(*src, tgt)
             total_loss += loss
+            running_loss += loss
 
             # Compute the gradient.
             loss.backward()
 
             # Take a step.
             optimizer.step()
+
+            if (i + 1) % opts.log_interval == 0:
+                loss_report = running_loss / opts.log_interval
+                progress = 100 * (i + 1) / len(dataset_train)
+                print("[{:5.2f}%] {:f}"
+                      .format(progress, loss_report))
+                running_loss = 0
+
+            i += 1
 
         print("Loss: {:f}".format(total_loss))
 
@@ -95,23 +107,25 @@ def main(args: List[str] = None) -> None:
 
     # Parse the args again.
     opts = parser.parse_args(args=args)
+    device = torch.device("cuda" if opts.cuda else "cpu")
 
     # Initialize the vocab and datasets.
+    print("Loading datasets")
     vocab = Vocab(opts.labels, cache=opts.vectors)
     dataset_train = Dataset()
     dataset_valid = Dataset()
     for fname in opts.train:
-        dataset_train.load_file(fname, vocab)
+        dataset_train.load_file(fname, vocab, device=device)
     print("Loaded {:d} sentences for training".format(len(dataset_train)),
           flush=True)
     if opts.valid:
         for fname in opts.valid:
-            dataset_valid.load_file(fname, vocab)
+            dataset_valid.load_file(fname, vocab, device=device)
         print("Loaded {:d} sentences for validation"
               .format(len(dataset_valid)))
 
     # Initialize the model.
-    model = model_class.cl_init(opts, vocab)
+    model = model_class.cl_init(opts, vocab).to(device)
     print(model, flush=True)
 
     # Train model.

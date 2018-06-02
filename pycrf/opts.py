@@ -40,6 +40,11 @@ def base_opts(parser: argparse.ArgumentParser) -> None:
         choices=list(MODEL_ALIASES.keys()),
         help="""The model to use."""
     )
+    group.add_argument(
+        "--cuda",
+        action="store_true",
+        help="""Use a cuda device."""
+    )
 
 
 def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
@@ -82,4 +87,10 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         type=int,
         default=10,
         help="""The maximum number of epochs to train for."""
+    )
+    group.add_argument(
+        "--log-interval",
+        type=int,
+        default=100,
+        help="""Log progress after processing this many batches."""
     )

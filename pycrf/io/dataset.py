@@ -41,7 +41,11 @@ class Dataset:
         self.source.append(src)
         self.target.append(tgt)
 
-    def load_file(self, fname: str, vocab: Vocab, limit: int = None) -> None:
+    def load_file(self,
+                  fname: str,
+                  vocab: Vocab,
+                  limit: int = None,
+                  device: torch.device = None) -> None:
         """
         Load sentences from a file.
 
@@ -67,8 +71,11 @@ class Dataset:
         vocab : pycrf.io.Vocab
             The vocab instance to apply to the sentences.
 
-        limit : int
+        limit : int, optional
             If set, will only load this many examples.
+
+        device : torch.device, optional
+            The device to send the tensors to.
 
         Returns
         -------
@@ -84,6 +91,8 @@ class Dataset:
                 if len(line_list) == 1:  # end of sentence.
                     # Get target tensor.
                     target_tensor = vocab.labs2tensor(tgt)
+                    if device is not None:
+                        target_tensor = target_tensor.to(device)
                     self.target.append(target_tensor)
 
                     # Get source tensors.
@@ -93,7 +102,18 @@ class Dataset:
                     # a single tensor.
                     sorted_char_tensors, lens, idxs = \
                         sort_and_pad(char_tensors, word_lengths)
-                    self.source.append((sorted_char_tensors, lens, idxs, word_tensors))
+                    if device is not None:
+                        sorted_char_tensors, lens, idxs, word_tensors = \
+                            sorted_char_tensors.to(device), \
+                            lens.to(device), \
+                            idxs.to(device), \
+                            word_tensors.to(device)
+                    self.source.append(
+                        (sorted_char_tensors,
+                         lens,
+                         idxs,
+                         word_tensors)
+                    )
 
                     src = []
                     tgt = []

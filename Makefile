@@ -10,7 +10,8 @@ help :
 		"Commands:\n"\
 		"  lint:      runs pylint and pydocstyle on source files.\n"\
 		"  typecheck: runs mypy to statically check types.\n"\
-		"  test:      runs pytest on the test/ directory."
+		"  unit-test: runs pytest on the test/ directory.\n"\
+		"  test:      runs all of the above."
 
 .PHONY : typecheck
 typecheck :
