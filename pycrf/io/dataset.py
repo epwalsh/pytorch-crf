@@ -1,15 +1,12 @@
 """Defines dataset class."""
 
-import logging
+import random
 from typing import List, Tuple, Generator, Type
 
 import torch
 
 from pycrf.nn.utils import sort_and_pad
 from .vocab import Vocab
-
-
-logger = logging.getLogger(__name__)
 
 
 SourceType = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
@@ -22,6 +19,7 @@ class Dataset:
     def __init__(self) -> None:
         self.source: List[SourceType] = []
         self.target: List[TargetType] = []
+        self._labels = set()
 
     def __getitem__(self, key: int) -> Tuple[SourceType, TargetType]:
         return self.source[key], self.target[key]
@@ -40,6 +38,12 @@ class Dataset:
         """Append a new training example."""
         self.source.append(src)
         self.target.append(tgt)
+
+    def shuffle(self) -> None:
+        """Shuffle source and targets together."""
+        combined = list(zip(self.source, self.target))
+        random.shuffle(combined)
+        self.source[:], self.target[:] = zip(*combined)
 
     def load_file(self,
                   fname: str,
@@ -82,6 +86,7 @@ class Dataset:
         None
 
         """
+        print("Loading file {:s}".format(fname), flush=True)
         i = 0
         with open(fname, "r") as datafile:
             src: List[str] = []
@@ -123,3 +128,8 @@ class Dataset:
                 else:
                     src.append(line_list[0])
                     tgt.append(line_list[1])
+                    if line_list[1] not in self._labels:
+                        self._labels.add(line_list[1])
+        missing = [x for x in self._labels if x not in vocab.labels_stoi]
+        if missing:
+            print("Warning: found additional labels in dataset", missing, flush=True)

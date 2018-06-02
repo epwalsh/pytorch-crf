@@ -16,6 +16,7 @@ You can see all of the options available for training a specific model with:
 """
 
 import argparse
+import time
 from typing import List
 
 import torch
@@ -34,11 +35,17 @@ def train(opts: argparse.Namespace,
         filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
 
     # Loop through epochs.
+    train_start_time = time.time()
     for epoch in range(opts.epochs):
+        epoch_start_time = running_time = time.time()
         print("Epoch {:d}".format(epoch + 1))
+
         i = 0
         total_loss = 0.
         running_loss = 0.
+
+        # Loop through training sentences.
+        dataset_train.shuffle()
         for src, tgt in dataset_train:
             # Zero out the gradient.
             model.zero_grad()
@@ -54,20 +61,26 @@ def train(opts: argparse.Namespace,
             # Take a step.
             optimizer.step()
 
+            # Log progress if necessary.
             if (i + 1) % opts.log_interval == 0:
-                loss_report = running_loss / opts.log_interval
                 progress = 100 * (i + 1) / len(dataset_train)
-                print("[{:5.2f}%] {:f}"
-                      .format(progress, loss_report))
+                duration = time.time() - running_time
+                print("[{:6.2f}%] loss: {:10.5f}, duration: {:.2f} seconds"
+                      .format(progress, running_loss, duration), flush=True)
                 running_loss = 0
-
+                running_time = time.time()
             i += 1
 
-        print("Loss: {:f}".format(total_loss))
+        epoch_duration = time.time() - epoch_start_time
+        print("Loss: {:f}, duration: {:.0f} seconds"
+              .format(total_loss, epoch_duration), flush=True)
 
         # Evaluate on validation set.
         if dataset_valid:
             pass
+
+    train_duration = time.time() - train_start_time
+    print("Total time {:.0f} seconds".format(train_duration))
 
 
 def main(args: List[str] = None) -> None:
@@ -108,10 +121,13 @@ def main(args: List[str] = None) -> None:
     # Parse the args again.
     opts = parser.parse_args(args=args)
     device = torch.device("cuda" if opts.cuda else "cpu")
+    if not opts.cuda and torch.cuda.is_available():
+        print("Warning: CUDA is available, but you have not used the --cuda flag")
 
     # Initialize the vocab and datasets.
-    print("Loading datasets")
     vocab = Vocab(opts.labels, cache=opts.vectors)
+    print("Training on labels:", list(vocab.labels_stoi.keys()))
+    print("Loading datasets", flush=True)
     dataset_train = Dataset()
     dataset_valid = Dataset()
     for fname in opts.train:
@@ -129,7 +145,10 @@ def main(args: List[str] = None) -> None:
     print(model, flush=True)
 
     # Train model.
-    train(opts, model, dataset_train, dataset_valid)
+    try:
+        train(opts, model, dataset_train, dataset_valid)
+    except KeyboardInterrupt:
+        print("Exiting early")
 
 
 if __name__ == "__main__":
