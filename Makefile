@@ -15,13 +15,14 @@ help :
 
 .PHONY : typecheck
 typecheck :
+	@echo "Typechecks (mypy):"
 	-@mypy pycrf --ignore-missing-imports
 
 .PHONY : lint
 lint :
-	@echo "Lint (pydocstyle):\n"
+	@echo "Lint (pydocstyle):"
 	-@pydocstyle --config=./.pydocstyle pycrf
-	@echo "\nLint (pylint):\n"
+	@echo "Lint (pylint):"
 	-@pylint --rcfile=./.pylintrc -f colorized pycrf
 
 .PHONY : unit-test

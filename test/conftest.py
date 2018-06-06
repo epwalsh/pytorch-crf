@@ -3,6 +3,7 @@
 import pytest
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
+from pycrf.eval import ModelStats
 from pycrf.io.dataset import Dataset
 from pycrf.io.vocab import Vocab
 from pycrf.modules import CharLSTM, LSTMCRF
@@ -36,3 +37,15 @@ def char_lstm(vocab):
 @pytest.fixture(scope="session")
 def lstm_crf(vocab, char_lstm, crf):
     return LSTMCRF(vocab, char_lstm, crf, hidden_dim=50)
+
+
+@pytest.fixture(scope="session")
+def get_model_stats(vocab):
+
+    def _get_model_stats(items):
+        model_stats = ModelStats(vocab.labels_stoi)
+        for labels, preds in items:
+            model_stats.update(labels, preds)
+        return model_stats
+
+    return _get_model_stats

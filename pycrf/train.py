@@ -21,6 +21,7 @@ from typing import List
 
 import torch
 
+from .eval import ModelStats
 from .io import Vocab, Dataset
 from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
 
@@ -34,11 +35,15 @@ def train(opts: argparse.Namespace,
     optimizer = torch.optim.SGD(
         filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
 
+    # Initialize evaluation metrics.
+    eval_stats = ModelStats(model.vocab.labels_stoi)
+
     # Loop through epochs.
     train_start_time = time.time()
     for epoch in range(opts.epochs):
         epoch_start_time = running_time = time.time()
-        print("Epoch {:d}".format(epoch + 1))
+        print("\nEpoch {:d}".format(epoch + 1))
+        print("============================================", flush=True)
 
         i = 0
         total_loss = 0.
@@ -77,10 +82,15 @@ def train(opts: argparse.Namespace,
 
         # Evaluate on validation set.
         if dataset_valid:
-            pass
+            eval_stats.reset()
+            for src, tgt in dataset_valid:
+                labs = list(tgt.cpu().numpy())
+                preds = model.predict(*src)[0][0]
+                eval_stats.update(labs, preds)
+            print(eval_stats, flush=True)
 
     train_duration = time.time() - train_start_time
-    print("Total time {:.0f} seconds".format(train_duration))
+    print("Total time {:.0f} seconds".format(train_duration), flush=True)
 
 
 def main(args: List[str] = None) -> None:

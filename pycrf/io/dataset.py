@@ -1,7 +1,8 @@
 """Defines dataset class."""
 
+from collections.abc import Sized, Iterable
 import random
-from typing import List, Tuple, Generator, Type
+from typing import List, Tuple, Generator, Type, Set
 
 import torch
 
@@ -13,13 +14,13 @@ SourceType = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 TargetType = Type[torch.Tensor]
 
 
-class Dataset:
+class Dataset(Sized, Iterable):
     """Class for abstracting training and testing datasets."""
 
     def __init__(self) -> None:
         self.source: List[SourceType] = []
         self.target: List[TargetType] = []
-        self._labels = set()
+        self._labels: Set = set()
 
     def __getitem__(self, key: int) -> Tuple[SourceType, TargetType]:
         return self.source[key], self.target[key]
