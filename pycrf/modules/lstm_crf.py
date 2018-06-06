@@ -259,7 +259,7 @@ class LSTMCRF(nn.Module):
             lens = torch.tensor([words.size(0)], device=words.device)
         mask = sequence_mask(lens)
 
-        # Fake batch dimension for labs.
+        # Fake batch dimension for ``labs``.
         labs = labs.unsqueeze(0)
         # labs: ``[1 x sent_length]``
 
