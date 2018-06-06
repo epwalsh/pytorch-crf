@@ -94,3 +94,10 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         default=100,
         help="""Log progress after processing this many batches."""
     )
+    group.add_argument(
+        "--optim",
+        type=str,
+        default="SGD",
+        choices=["SGD"],
+        help="""The optimizer to use."""
+    )

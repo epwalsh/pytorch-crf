@@ -23,18 +23,16 @@ import torch
 
 from .eval import ModelStats
 from .io import Vocab, Dataset
+from .optim import OPTIM_ALIASES
 from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
 
 
 def train(opts: argparse.Namespace,
           model: torch.nn.Module,
+          optimizer: torch.optim.Optimizer,
           dataset_train: Dataset,
           dataset_valid: Dataset = None) -> None:
     """Train a model on the given dataset."""
-    # Initialize optimizer.
-    optimizer = torch.optim.SGD(
-        filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
-
     # Initialize evaluation metrics.
     eval_stats = ModelStats(model.vocab.labels_stoi)
 
@@ -80,6 +78,9 @@ def train(opts: argparse.Namespace,
         print("Loss: {:f}, duration: {:.0f} seconds"
               .format(total_loss, epoch_duration), flush=True)
 
+        # Update optimizer.
+        optimizer.epoch_update()
+
         # Evaluate on validation set.
         if dataset_valid:
             eval_stats.reset()
@@ -119,6 +120,10 @@ def main(args: List[str] = None) -> None:
     train_opts(parser, require=not initial_opts.help)
     initial_opts, _ = parser.parse_known_args(args=args)
 
+    # Add optimizer-specific options.
+    optim_class = OPTIM_ALIASES[initial_opts.optim]
+    optim_class.cl_opts(parser)
+
     # Add model-specific options.
     model_class = MODEL_ALIASES[initial_opts.model]
     model_class.cl_opts(parser)
@@ -154,9 +159,13 @@ def main(args: List[str] = None) -> None:
     model = model_class.cl_init(opts, vocab).to(device)
     print(model, flush=True)
 
+    # Initialize the optimizer.
+    optimizer = optim_class.cl_init(
+        filter(lambda p: p.requires_grad, model.parameters()), opts)
+
     # Train model.
     try:
-        train(opts, model, dataset_train, dataset_valid)
+        train(opts, model, optimizer, dataset_train, dataset_valid)
     except KeyboardInterrupt:
         print("Exiting early")
 
