@@ -61,6 +61,11 @@ def train(opts: argparse.Namespace,
             # Compute the gradient.
             loss.backward()
 
+            # Clip gradients.
+            if opts.max_grad is not None:
+                torch.nn.utils.clip_grad_value_(
+                    model.parameters(), opts.max_grad)
+
             # Take a step.
             optimizer.step()
 

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractstaticmethod, abstractclassmethod
 import argparse
-from typing import Iterable
+from typing import Iterable, Dict, Type
 
 import torch
 
@@ -288,7 +288,7 @@ class SGD(torch.optim.SGD, CLOptim):
             print(f"Updating learning rate to {self.lr}", flush=True)
 
 
-OPTIM_ALIASES = {
+OPTIM_ALIASES: Dict[str, Type[CLOptim]] = {
     "SGD": SGD,
     "Adam": Adam,
     "AdaDelta": AdaDelta,

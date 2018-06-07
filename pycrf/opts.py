@@ -102,3 +102,8 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         choices=list(OPTIM_ALIASES.keys()),
         help="""The optimizer to use."""
     )
+    group.add_argument(
+        "--max-grad",
+        type=float,
+        help="""Clip gradient components that exceed this in absolute value."""
+    )
