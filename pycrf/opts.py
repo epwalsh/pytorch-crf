@@ -3,6 +3,7 @@
 import argparse
 
 from .modules import LSTMCRF
+from .optim import OPTIM_ALIASES
 
 
 MODEL_ALIASES = {
@@ -98,6 +99,6 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         "--optim",
         type=str,
         default="SGD",
-        choices=["SGD"],
+        choices=list(OPTIM_ALIASES.keys()),
         help="""The optimizer to use."""
     )

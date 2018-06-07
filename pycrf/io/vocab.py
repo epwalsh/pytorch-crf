@@ -83,7 +83,7 @@ class Vocab:
                  unk_term: str = "UNK",
                  pad_char: str = "PAD",
                  unk_char: str = "UNK",
-                 word_vec_dim: int = 300,
+                 word_vec_dim: int = 100,
                  cache: str = None) -> None:
         self.default_label = default_label
         self.labels_stoi = {default_label: 0}

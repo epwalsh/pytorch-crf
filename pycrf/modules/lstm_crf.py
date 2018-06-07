@@ -277,17 +277,17 @@ class LSTMCRF(nn.Module):
         group = parser.add_argument_group("Bi-LSTM CRF options")
         group.add_argument(
             "--char_hidden_dim",
-            type=float,
+            type=int,
             default=50,
             help="""Dimension of the hidden layer for the character-level
-            features LSTM."""
+            features LSTM. Default is 50."""
         )
         group.add_argument(
             "--word_hidden_dim",
-            type=float,
+            type=int,
             default=50,
             help="""Dimension of the hidden layer for the word-level
-            features LSTM."""
+            features LSTM. Default is 50."""
         )
 
     @classmethod

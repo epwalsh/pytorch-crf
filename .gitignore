@@ -108,3 +108,7 @@ scratch*
 
 # torchtext stuff
 .vector_cache
+
+# log files
+log*
+*.log

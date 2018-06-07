@@ -34,7 +34,7 @@ def train(opts: argparse.Namespace,
           dataset_valid: Dataset = None) -> None:
     """Train a model on the given dataset."""
     # Initialize evaluation metrics.
-    eval_stats = ModelStats(model.vocab.labels_stoi)
+    eval_stats = ModelStats(model.vocab.labels_stoi, verbose=opts.verbose)
 
     # Loop through epochs.
     train_start_time = time.time()
@@ -65,7 +65,7 @@ def train(opts: argparse.Namespace,
             optimizer.step()
 
             # Log progress if necessary.
-            if (i + 1) % opts.log_interval == 0:
+            if opts.verbose and (i + 1) % opts.log_interval == 0:
                 progress = 100 * (i + 1) / len(dataset_train)
                 duration = time.time() - running_time
                 print("[{:6.2f}%] loss: {:10.5f}, duration: {:.2f} seconds"

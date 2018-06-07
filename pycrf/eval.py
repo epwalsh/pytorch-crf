@@ -118,7 +118,9 @@ class ModelStats:
     # pylint: disable=invalid-name
     """Aggregates statistics for a model on an evaluation set."""
 
-    def __init__(self, labels_stoi: Dict[str, int]) -> None:
+    def __init__(self,
+                 labels_stoi: Dict[str, int],
+                 verbose: bool = True) -> None:
         self.label_stats = {
             label_name: LabelStats(label_id, label_name)
             for label_name, label_id in labels_stoi.items()
@@ -127,6 +129,7 @@ class ModelStats:
         self.instance_match = 0
         self.instance_count = 0
         self.item_count = 0
+        self.verbose = verbose
 
     @property  # type: ignore
     @safe_divide
@@ -158,7 +161,11 @@ class ModelStats:
             precision_sum += precision or 0.
             recall_sum += recall or 0.
             f1_sum += f1 or 0.
-        out = "\n".join(by_label) + "\n"
+
+        if self.verbose:
+            out = "\n".join(by_label) + "\n"
+        else:
+            out = ""
 
         # Gather macro statistics.
         macro_avg_precision = precision_sum / len(self.label_stats)
