@@ -9,41 +9,34 @@ from pycrf.io.vocab import Vocab
 from pycrf.modules import CharLSTM, LSTMCRF
 
 
-LABELS = ["O", "B-NAME", "I-NAME"]
-
-
 @pytest.fixture(scope="session")
-def vocab():
-    return Vocab(LABELS, cache="test/.vector_cache")
-
-
-@pytest.fixture(scope="session")
-def dataset(vocab):
+def vocab_dataset():
+    vocab = Vocab(cache="test/.vector_cache")
     dataset = Dataset()
     dataset.load_file("test/data/sample_dataset.txt", vocab)
-    return dataset
+    return vocab, dataset
 
 
 @pytest.fixture(scope="session")
-def crf():
-    return ConditionalRandomField(len(LABELS))
+def crf(vocab_dataset):
+    return ConditionalRandomField(vocab_dataset[0].n_labels)
 
 
 @pytest.fixture(scope="session")
-def char_lstm(vocab):
-    return CharLSTM(vocab.n_chars, 50)
+def char_lstm(vocab_dataset):
+    return CharLSTM(vocab_dataset[0].n_chars, 50)
 
 
 @pytest.fixture(scope="session")
-def lstm_crf(vocab, char_lstm, crf):
-    return LSTMCRF(vocab, char_lstm, crf, hidden_dim=50)
+def lstm_crf(vocab_dataset, char_lstm, crf):
+    return LSTMCRF(vocab_dataset[0], char_lstm, crf, hidden_dim=50)
 
 
 @pytest.fixture(scope="session")
-def get_model_stats(vocab):
+def get_model_stats(vocab_dataset):
 
     def _get_model_stats(items):
-        model_stats = ModelStats(vocab.labels_stoi)
+        model_stats = ModelStats(vocab_dataset[0].labels_stoi)
         for labels, preds in items:
             model_stats.update(labels, preds)
         return model_stats

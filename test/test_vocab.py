@@ -6,8 +6,9 @@ import torch
 from pycrf.nn.utils import assert_equal
 
 
-def test_labels(vocab):
+def test_labels(vocab_dataset):
     """Test that the target label attributes and methods work."""
+    vocab = vocab_dataset[0]
     assert vocab.n_labels == 3
     assert vocab.labels_stoi["O"] == 0
     assert vocab.labels_itos[0] == "O"
@@ -17,8 +18,9 @@ def test_labels(vocab):
     assert vocab.labels_itos[2] == "I-NAME"
 
 
-def test_chars(vocab):
+def test_chars(vocab_dataset):
     """Check to make sure the vocab characters are initialized correctly."""
+    vocab = vocab_dataset[0]
     assert vocab.chars_stoi[vocab.pad_char] == 0
     assert vocab.chars_stoi[vocab.unk_char] == 1
     assert vocab.chars_itos[0] == vocab.pad_char
@@ -27,13 +29,15 @@ def test_chars(vocab):
     assert vocab.n_chars < 100
 
 
-def test_words(vocab):
+def test_words(vocab_dataset):
     """Check to make sure the GloVe attr was initialized correctly."""
+    vocab = vocab_dataset[0]
     assert vocab.n_words > 10000
 
 
-def test_vectors(vocab):
+def test_vectors(vocab_dataset):
     """Check that the word embedding vectors look like they're supposed to."""
+    vocab = vocab_dataset[0]
     assert vocab.glove.vectors[0].size()[0] == vocab.word_vec_dim
 
 
@@ -45,8 +49,9 @@ cases = [
 
 
 @pytest.mark.parametrize("sent", cases)
-def test_sent2tensor(vocab, sent):
+def test_sent2tensor(vocab_dataset, sent):
     """Check that Vocab.sent2tensor has the correct output format."""
+    vocab = vocab_dataset[0]
     char_tensors, word_lengths, word_idxs, word_tensors = \
         vocab.sent2tensor(sent)
 

@@ -72,13 +72,6 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         help="""Path to the file where the trained model should be saved."""
     )
     group.add_argument(
-        "--labels",
-        type=str,
-        nargs="+",
-        required=require,
-        help="""The target labels to use."""
-    )
-    group.add_argument(
         "--vectors",
         type=str,
         help="""Path to vector cache."""

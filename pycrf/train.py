@@ -145,8 +145,7 @@ def main(args: List[str] = None) -> None:
         print("Warning: CUDA is available, but you have not used the --cuda flag")
 
     # Initialize the vocab and datasets.
-    vocab = Vocab(opts.labels, cache=opts.vectors)
-    print("Training on labels:", list(vocab.labels_stoi.keys()))
+    vocab = Vocab(cache=opts.vectors)
     print("Loading datasets", flush=True)
     dataset_train = Dataset()
     dataset_valid = Dataset()
@@ -159,6 +158,7 @@ def main(args: List[str] = None) -> None:
             dataset_valid.load_file(fname, vocab, device=device)
         print("Loaded {:d} sentences for validation"
               .format(len(dataset_valid)))
+    print("Training on labels:", list(vocab.labels_stoi.keys()))
 
     # Initialize the model.
     model = model_class.cl_init(opts, vocab).to(device)

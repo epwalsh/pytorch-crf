@@ -1,8 +1,9 @@
 """Tests for CharLSTM class."""
 
 
-def test_forward(char_lstm, dataset):
+def test_forward(char_lstm, vocab_dataset):
     """Test `CharLSTM.forward()` method."""
+    dataset = vocab_dataset[1]
     for src, tgt in dataset:
         res = char_lstm(*src[:-1])
         n_words, dim = res.size()

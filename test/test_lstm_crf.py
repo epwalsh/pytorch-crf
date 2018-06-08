@@ -1,8 +1,9 @@
 """Tests for pycrf.modules.LSTMCRF methods."""
 
 
-def test_feats(lstm_crf, dataset):
+def test_feats(lstm_crf, vocab_dataset):
     """Test `Tagger._feats()` method."""
+    dataset = vocab_dataset[1]
     for src, _ in dataset:
         res = lstm_crf._feats(*src)
         batch_size, sent_length, n_labels = res.size()
@@ -11,8 +12,9 @@ def test_feats(lstm_crf, dataset):
         assert n_labels == lstm_crf.vocab.n_labels
 
 
-def test_predict(lstm_crf, dataset):
+def test_predict(lstm_crf, vocab_dataset):
     """Test `Tagger.predict()` method."""
+    dataset = vocab_dataset[1]
     for src, _ in dataset:
         preds = lstm_crf.predict(*src)
         # Just get first batch since there is only one.
@@ -28,7 +30,8 @@ def test_predict(lstm_crf, dataset):
             assert lab_idx in lstm_crf.vocab.labels_itos
 
 
-def test_forward(lstm_crf, dataset):
+def test_forward(lstm_crf, vocab_dataset):
     """Test `Tagger.forward()` method."""
+    dataset = vocab_dataset[1]
     for src, tgt in dataset:
         lstm_crf.forward(*src, tgt)

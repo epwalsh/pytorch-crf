@@ -2,7 +2,7 @@
 
 from collections.abc import Sized, Iterable
 import random
-from typing import List, Tuple, Generator, Set
+from typing import List, Tuple, Generator
 
 import torch
 
@@ -15,7 +15,6 @@ class Dataset(Sized, Iterable):
     def __init__(self) -> None:
         self.source: List[SourceType] = []
         self.target: List[TargetType] = []
-        self._labels: Set = set()
 
     def __getitem__(self, key: int) -> Tuple[SourceType, TargetType]:
         return self.source[key], self.target[key]
@@ -106,8 +105,3 @@ class Dataset(Sized, Iterable):
                 else:
                     src.append(line_list[0])
                     tgt.append(line_list[1])
-                    if line_list[1] not in self._labels:
-                        self._labels.add(line_list[1])
-        missing = [x for x in self._labels if x not in vocab.labels_stoi]
-        if missing:
-            print("Warning: found additional labels in dataset", missing, flush=True)

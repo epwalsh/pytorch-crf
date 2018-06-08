@@ -80,7 +80,7 @@ class Vocab:
     """
 
     def __init__(self,
-                 labels: List[str],
+                 labels: List[str] = None,
                  default_label: str = "O",
                  unk_term: str = "UNK",
                  pad_char: str = "PAD",
@@ -103,7 +103,7 @@ class Vocab:
         self.glove = torchtext.vocab.GloVe(
             name="6B", dim=self.word_vec_dim, cache=cache)
 
-        for lab in labels:
+        for lab in labels or []:
             ind = self.labels_stoi.setdefault(lab, len(self.labels_stoi))
             self.labels_itos[ind] = lab
 
@@ -207,7 +207,12 @@ class Vocab:
             The tensor of integers corresponding to the list of labels.
 
         """
-        target = torch.tensor([self.labels_stoi.get(lab, 0) for lab in labs])
+        lab_ids = []
+        for lab in labs:
+            i = self.labels_stoi.setdefault(lab, len(self.labels_stoi))
+            lab_ids.append(i)
+            self.labels_itos[i] = lab
+        target = torch.tensor(lab_ids)
         if device is not None:
             target = target.to(device)
         return target

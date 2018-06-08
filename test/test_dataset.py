@@ -5,13 +5,14 @@ import torch
 from pycrf.nn.utils import assert_equal
 
 
-def test_size(dataset):
+def test_size(vocab_dataset):
     """Make sure the right number of sentences were loaded."""
-    assert len(dataset) == 4
+    assert len(vocab_dataset[1]) == 4
 
 
-def test_source(dataset, vocab):
+def test_source(vocab_dataset):
     """Make sure the `source` attr contains what we expect."""
+    vocab, dataset = vocab_dataset
     assert len(dataset.source) == 4
 
     # Check the first item, which comes from the sentence:
@@ -28,8 +29,9 @@ def test_source(dataset, vocab):
     assert list(word_embs.size()) == [2, vocab.word_vec_dim]
 
 
-def test_target(dataset, vocab):
+def test_target(vocab_dataset):
     """Make sure the `target` attr contains what we expect."""
+    vocab, dataset = vocab_dataset
     assert len(dataset.target) == 4
     assert_equal(dataset.target[0], torch.tensor([0, 0]))
     assert_equal(dataset.target[1], torch.tensor([0, 0, 0, 1]))
