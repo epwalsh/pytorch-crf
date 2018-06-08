@@ -172,6 +172,7 @@ class LSTMCRF(nn.Module):
                 word_indices: torch.Tensor,
                 word_embs: torch.Tensor,
                 lens: torch.Tensor = None) -> List[Tuple[List[int], float]]:
+        # pylint: disable=not-callable
         """
         Compute the best tag sequence.
 
@@ -201,7 +202,6 @@ class LSTMCRF(nn.Module):
             The best path for each sentence in the batch.
 
         """
-        # pylint: disable=not-callable
         if lens is None:
             lens = torch.tensor([words.size(0)])
         mask = sequence_mask(lens)
@@ -222,6 +222,7 @@ class LSTMCRF(nn.Module):
                 word_embs: torch.Tensor,
                 labs: torch.Tensor,
                 lens: torch.Tensor = None) -> torch.Tensor:
+        # pylint: disable=arguments-differ,not-callable
         """
         Compute the negative of the log-likelihood.
 
@@ -254,7 +255,6 @@ class LSTMCRF(nn.Module):
             The negative log-likelihood evaluated at the inputs.
 
         """
-        # pylint: disable=arguments-differ,not-callable
         if lens is None:
             lens = torch.tensor([words.size(0)], device=words.device)
         mask = sequence_mask(lens)
@@ -276,23 +276,17 @@ class LSTMCRF(nn.Module):
         """Define command-line options specific to this model."""
         group = parser.add_argument_group("Bi-LSTM CRF options")
         group.add_argument(
-            "--char_hidden_dim",
-            type=int,
-            default=50,
-            help="""Dimension of the hidden layer for the character-level
-            features LSTM. Default is 50."""
-        )
-        group.add_argument(
-            "--word_hidden_dim",
+            "--hidden-dim",
             type=int,
             default=50,
             help="""Dimension of the hidden layer for the word-level
             features LSTM. Default is 50."""
         )
+        CharLSTM.cl_opts(parser)
 
     @classmethod
     def cl_init(cls, opts: argparse.Namespace, vocab: Vocab):
         """Initialize an instance of this model from command-line options."""
         crf = ConditionalRandomField(vocab.n_labels)
-        char_lstm = CharLSTM(vocab.n_chars, opts.char_hidden_dim)
-        return cls(vocab, char_lstm, crf, hidden_dim=opts.word_hidden_dim)
+        char_lstm = CharLSTM.cl_init(opts, vocab)
+        return cls(vocab, char_lstm, crf, hidden_dim=opts.hidden_dim)

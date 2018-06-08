@@ -22,7 +22,7 @@ def test_source(dataset, vocab):
     assert isinstance(word_idxs, torch.Tensor)
     assert isinstance(word_embs, torch.Tensor)
 
-    assert list(words.size()) == [2, 5, vocab.n_chars]
+    assert list(words.size()) == [2, 5]
     assert_equal(word_lens, torch.tensor([5, 2]))
     assert_equal(word_idxs, torch.tensor([1, 0]))
     assert list(word_embs.size()) == [2, vocab.word_vec_dim]

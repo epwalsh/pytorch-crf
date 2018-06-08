@@ -3,6 +3,8 @@
 import pytest
 import torch
 
+from pycrf.nn.utils import assert_equal
+
 
 def test_labels(vocab):
     """Test that the target label attributes and methods work."""
@@ -37,6 +39,7 @@ def test_vectors(vocab):
 
 cases = [
     ["hi", "there"],
+    ["hi", "there", "what", "is", "your", "name", "?"],
     ["hi"],
 ]
 
@@ -44,14 +47,26 @@ cases = [
 @pytest.mark.parametrize("sent", cases)
 def test_sent2tensor(vocab, sent):
     """Check that Vocab.sent2tensor has the correct output format."""
-    char_tensors, word_lengths, word_tensors = vocab.sent2tensor(sent)
-    assert isinstance(char_tensors, list)
-    assert len(char_tensors) == len(sent)
+    char_tensors, word_lengths, word_idxs, word_tensors = \
+        vocab.sent2tensor(sent)
+
+    check_lens = [len(s) for s in sent]
+    check_sorted_lens = sorted(check_lens, reverse=True)
+    check_idxs = sorted(range(len(sent)), reverse=True, key=lambda i: check_lens[i])
+
+    # Verify sizes.
+    assert isinstance(char_tensors, torch.Tensor)
+    assert list(char_tensors.size()) == [len(sent), max(check_lens)]
     assert isinstance(word_tensors, torch.Tensor)
-    assert word_tensors.size()[0] == len(sent)
-    assert word_tensors.size()[1] == vocab.word_vec_dim
-    for i, item in enumerate(char_tensors):
-        assert isinstance(item, torch.Tensor)
-        assert item.size()[0] == len(sent[i])
-        assert item.size()[1] == vocab.n_chars
-        assert item.sum().item() == len(sent[i])
+    assert list(word_tensors.size()) == [len(sent), vocab.word_vec_dim]
+
+    # Verify order of word lengths and idxs.
+    assert_equal(word_lengths, torch.tensor(check_sorted_lens))
+    assert_equal(word_idxs, torch.tensor(check_idxs))
+
+    for i, word_tensor in enumerate(char_tensors):
+        check_word = sent[check_idxs[i]]
+        check_word_tensor = torch.tensor(
+            [vocab.chars_stoi[c] for c in check_word] + [0] * (max(check_lens) - len(check_word))
+        )
+        assert_equal(word_tensor, check_word_tensor)

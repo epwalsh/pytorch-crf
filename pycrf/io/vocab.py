@@ -1,14 +1,16 @@
 """Defines a class for holding a vocabulary set."""
 
-import logging
 import string
-from typing import List, Tuple
+from typing import List, Tuple, Type
 
 import torch
 import torchtext
 
+from pycrf.nn.utils import sort_and_pad
 
-logger = logging.getLogger(__name__)
+
+SourceType = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+TargetType = Type[torch.Tensor]
 
 
 class Vocab:
@@ -129,7 +131,9 @@ class Vocab:
         return len(self.labels_itos)
 
     def sent2tensor(self,
-                    sent: List[str]) -> Tuple[List[torch.Tensor], torch.Tensor, torch.Tensor]:
+                    sent: List[str],
+                    device: torch.device = None) -> SourceType:
+        # pylint: disable=not-callable
         """
         Transform a sentence into a tensor.
 
@@ -138,36 +142,54 @@ class Vocab:
         sent : List[str]
             The sentence to transform.
 
+        device : torch.device, optional
+            The device to send the tensors to.
+
         Returns
         -------
-        Tuple[List[torch.Tensor], torch.Tensor, torch.Tensor]
-            The first item is a list of word tensors, each of has shape
-            ``[word_length x self.n_chars]``.
-            The second item is a tensor holding the original lengths of the
-            words. The third item has is a tensor of size
-            ``[len(sent) x self.word_vec_dim]``, representing the word
-            embeddings for each word.
+        SourceType
+            A tuple where the first item is the sorted words in their character
+            representation. The second item is the lengths of those words as
+            defined by the number of characters. The third item is the sorted
+            ids of the words so that the original order can be retained, and the
+            fourth is an unsorted tensor of word embeddings.
 
         """
-        # pylint: disable=not-callable
-        char_tensors = []
-        word_lengths = []
-        word_tensors = []
+        # Encode words and characters.
+        word_lengths_list: List[int] = []           # length of each word.
+        word_vec_emb_list: List[torch.Tensor] = []  # words represented by their vector embedding.
+        word_tensors_list: List[torch.Tensor] = []  # words represented by their characters.
         for tok in sent:
-            word_lengths.append(len(tok))
-            word_tensors.append(
+            word_lengths_list.append(len(tok))
+            word_vec_emb_list.append(
                 self.glove[self.glove.stoi.get(tok.lower(), -1)])
-            tmp_list = []
-            for char in tok:
-                tmp = torch.zeros(self.n_chars)
-                tmp[self.chars_stoi.get(char, 0)] = 1
-                tmp_list.append(tmp.view(1, -1))
-            char_tensors.append(torch.cat(tmp_list))
-        return (char_tensors,
-                torch.tensor(word_lengths),
-                torch.cat(word_tensors, dim=0))
+            tmp = torch.tensor([
+                self.chars_stoi.get(char, self.chars_stoi[self.unk_char])
+                for char in tok
+            ])
+            word_tensors_list.append(tmp)
 
-    def labs2tensor(self, labs: List[str]) -> torch.Tensor:
+        # Convert into tensors.
+        word_lengths = torch.tensor(word_lengths_list)
+        word_vec_emb = torch.cat(word_vec_emb_list, dim=0)
+        # Words are sorted and padded by word length.
+        word_tensors, lens, idxs = \
+            sort_and_pad(word_tensors_list, word_lengths)
+
+        # Send to device (like a cuda device) if device was given.
+        if device is not None:
+            word_tensors, lens, idxs, word_vec_emb = \
+                word_tensors.to(device), \
+                lens.to(device), \
+                idxs.to(device), \
+                word_vec_emb.to(device)
+
+        return word_tensors, lens, idxs, word_vec_emb
+
+    def labs2tensor(self,
+                    labs: List[str],
+                    device: torch.device = None) -> TargetType:
+        # pylint: disable=not-callable
         """
         Transform a list of labels to a tensor.
 
@@ -176,11 +198,16 @@ class Vocab:
         labs : list of str
             The list of labels to transform.
 
+        device : torch.device, optional
+            The device to send the tensors to.
+
         Returns
         -------
         torch.Tensor
             The tensor of integers corresponding to the list of labels.
 
         """
-        # pylint: disable=not-callable
-        return torch.tensor([self.labels_stoi.get(lab, 0) for lab in labs])
+        target = torch.tensor([self.labels_stoi.get(lab, 0) for lab in labs])
+        if device is not None:
+            target = target.to(device)
+        return target

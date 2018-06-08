@@ -220,6 +220,50 @@ class Adam(torch.optim.Adam, CLOptim):
                    weight_decay=opts.weight_decay)
 
 
+class SparseAdam(torch.optim.SparseAdam, CLOptim):
+    """Wraps torch SparseAdam optimizer."""
+
+    @staticmethod
+    def cl_opts(parser: argparse.ArgumentParser) -> None:
+        """Add command line options specific to Adam."""
+        group = parser.add_argument_group("SparseAdam options")
+        group.add_argument(
+            "--lr",
+            type=float,
+            default=0.001,
+            help="""Learning rate. Default is 0.001."""
+        )
+        group.add_argument(
+            "--beta1",
+            type=float,
+            default=0.9,
+            help="""Coefficient used for computing running averages of gradient
+            and its square. Default is 0.9"""
+        )
+        group.add_argument(
+            "--beta2",
+            type=float,
+            default=0.999,
+            help="""Coefficient used for computing running averages of gradient
+            and its square. Default is 0.999"""
+        )
+        group.add_argument(
+            "--eps",
+            type=float,
+            default=1e-8,
+            help="""Term added to denominator to add numerical stabiliary.
+            Default is 1e-8."""
+        )
+
+    @classmethod
+    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+        """Initialize Adam optimizer from command line options."""
+        return cls(params,
+                   lr=opts.lr,
+                   betas=(opts.beta1, opts.beta2),
+                   eps=opts.eps)
+
+
 class SGD(torch.optim.SGD, CLOptim):
     """Wraps torch stochastic gradient descent optimizer."""
 
@@ -291,6 +335,7 @@ class SGD(torch.optim.SGD, CLOptim):
 OPTIM_ALIASES: Dict[str, Type[CLOptim]] = {
     "SGD": SGD,
     "Adam": Adam,
+    "SparseAdam": SparseAdam,
     "AdaDelta": AdaDelta,
     "AdaGrad": AdaGrad,
     "RMSProp": RMSProp,

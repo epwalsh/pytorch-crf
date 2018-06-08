@@ -1,10 +1,13 @@
 """Implements a character-sequence LSTM to generate words features."""
 
+import argparse
+
 import torch
 import torch.nn as nn
-from torch.nn import LSTM
+from torch.nn import LSTM, Embedding
 from torch.nn.utils.rnn import pack_padded_sequence
 
+from pycrf.io import Vocab
 from pycrf.nn.utils import unsort
 
 
@@ -29,6 +32,12 @@ class CharLSTM(nn.Module):
     dropout : float, optional (default: 0.)
         The dropout probability for the recurrent layer.
 
+    embedding_size : int, optional (default: 50)
+        The size of the embedding layer.
+
+    padding_idx : int, optional (default: 0)
+        The id of the character using for padding.
+
     Attributes
     ----------
     n_chars : int
@@ -37,6 +46,9 @@ class CharLSTM(nn.Module):
     output_size : int
         The dimension of the output, which is
         ``layers * hidden_size * directions``.
+
+    embedding : torch.nn
+        The character embedding layer.
 
     rnn : torch.nn
         The LSTM layer.
@@ -47,16 +59,20 @@ class CharLSTM(nn.Module):
                  n_chars: int,
                  hidden_size: int,
                  bidirectional: bool = True,
+                 embedding_size: int = 50,
                  layers: int = 1,
-                 dropout: float = 0.) -> None:
+                 dropout: float = 0.,
+                 padding_idx: int = 0) -> None:
         super(CharLSTM, self).__init__()
 
         self.n_chars = n_chars
+        self.embedding = \
+            Embedding(self.n_chars, embedding_size, padding_idx=padding_idx)
         self.output_size = layers * hidden_size
         if bidirectional:
             self.output_size *= 2
 
-        self.rnn = LSTM(input_size=self.n_chars,
+        self.rnn = LSTM(input_size=embedding_size,
                         hidden_size=hidden_size,
                         num_layers=layers,
                         batch_first=True,
@@ -67,13 +83,14 @@ class CharLSTM(nn.Module):
                 inputs: torch.Tensor,
                 lengths: torch.Tensor,
                 indices: torch.Tensor) -> torch.Tensor:
+        # pylint: disable=arguments-differ
         """
         Make a forward pass through the network.
 
         Parameters
         ----------
         inputs : torch.Tensor
-            Tensor of shape ``[sent_length x word_length x n_chars]``.
+            Tensor of shape ``[sent_length x max_word_length]``.
 
         lengths : torch.Tensor
             The length of each word ``[sent_length]``.
@@ -89,10 +106,14 @@ class CharLSTM(nn.Module):
             ``[len(inputs) x (layers * directions * hidden_size)]``
 
         """
-        # pylint: disable=arguments-differ
         sent_length = inputs.size()[0]
 
-        packed = pack_padded_sequence(inputs, lengths, batch_first=True)
+        # Pass inputs through embedding layer.
+        inputs_emb = self.embedding(inputs)
+        # inputs_emb: ``[sent_length x max_word_length x embedding_size]``
+
+        # Turned the padded inputs into a packed sequence.
+        packed = pack_padded_sequence(inputs_emb, lengths, batch_first=True)
 
         _, state = self.rnn(packed)
         hidden = state[0]
@@ -107,3 +128,28 @@ class CharLSTM(nn.Module):
         hidden = unsort(hidden, indices)
 
         return hidden
+
+    @staticmethod
+    def cl_opts(parser: argparse.ArgumentParser) -> None:
+        """Define command-line options specific to this model."""
+        group = parser.add_argument_group("Character LSTM options")
+        group.add_argument(
+            "--char-hidden-dim",
+            type=int,
+            default=50,
+            help="""Dimension of the hidden layer for the character-level
+            features LSTM. Default is 50."""
+        )
+        group.add_argument(
+            "--char-embedding-size",
+            type=int,
+            default=50,
+            help="""The dimension of the character embedding layer."""
+        )
+
+    @classmethod
+    def cl_init(cls, opts: argparse.Namespace, vocab: Vocab):
+        """Initialize an instance of this model from command-line options."""
+        return cls(vocab.n_chars,
+                   opts.char_hidden_dim,
+                   embedding_size=opts.char_embedding_size)

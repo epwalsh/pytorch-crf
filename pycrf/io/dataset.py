@@ -2,16 +2,11 @@
 
 from collections.abc import Sized, Iterable
 import random
-from typing import List, Tuple, Generator, Type, Set
+from typing import List, Tuple, Generator, Set
 
 import torch
 
-from pycrf.nn.utils import sort_and_pad
-from .vocab import Vocab
-
-
-SourceType = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
-TargetType = Type[torch.Tensor]
+from .vocab import Vocab, SourceType, TargetType
 
 
 class Dataset(Sized, Iterable):
@@ -96,30 +91,12 @@ class Dataset(Sized, Iterable):
                 line_list = line.rstrip().split('\t')
                 if len(line_list) == 1:  # end of sentence.
                     # Get target tensor.
-                    target_tensor = vocab.labs2tensor(tgt)
-                    if device is not None:
-                        target_tensor = target_tensor.to(device)
+                    target_tensor = vocab.labs2tensor(tgt, device=device)
                     self.target.append(target_tensor)
 
                     # Get source tensors.
-                    char_tensors, word_lengths, word_tensors = \
-                        vocab.sent2tensor(src)
-                    # ``char_tensors`` is a list. Sort and pad to turn it into
-                    # a single tensor.
-                    sorted_char_tensors, lens, idxs = \
-                        sort_and_pad(char_tensors, word_lengths)
-                    if device is not None:
-                        sorted_char_tensors, lens, idxs, word_tensors = \
-                            sorted_char_tensors.to(device), \
-                            lens.to(device), \
-                            idxs.to(device), \
-                            word_tensors.to(device)
-                    self.source.append(
-                        (sorted_char_tensors,
-                         lens,
-                         idxs,
-                         word_tensors)
-                    )
+                    source_tensor = vocab.sent2tensor(src, device=device)
+                    self.source.append(source_tensor)
 
                     src = []
                     tgt = []
