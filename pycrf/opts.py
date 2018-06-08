@@ -46,6 +46,12 @@ def base_opts(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="""Use a cuda device."""
     )
+    group.add_argument(
+        "--gpu-id",
+        type=int,
+        default=0,
+        help="""GPU device ID to use."""
+    )
 
 
 def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
@@ -99,4 +105,10 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         "--max-grad",
         type=float,
         help="""Clip gradient components that exceed this in absolute value."""
+    )
+    group.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="""Mini batch size. Default is 1."""
     )

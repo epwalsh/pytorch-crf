@@ -28,12 +28,9 @@ def sequence_mask(lens: torch.Tensor, max_len: int = None) -> torch.ByteTensor:
     if max_len is None:
         max_len = lens.max().item()
 
-    ranges = torch.arange(0, max_len).long()
+    ranges = torch.arange(0, max_len, device=lens.device).long()
     ranges = ranges.unsqueeze(0).expand(batch_size, max_len)
     ranges = torch.autograd.Variable(ranges)
-
-    if lens.data.is_cuda:
-        ranges = ranges.cuda()
 
     lens_exp = lens.unsqueeze(1).expand_as(ranges)
     mask = ranges < lens_exp

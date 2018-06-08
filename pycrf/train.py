@@ -32,6 +32,7 @@ def train(opts: argparse.Namespace,
           optimizer: torch.optim.Optimizer,
           dataset_train: Dataset,
           dataset_valid: Dataset = None) -> None:
+    # pylint: disable=invalid-name,not-callable
     """Train a model on the given dataset."""
     # Initialize evaluation metrics.
     eval_stats = ModelStats(model.vocab.labels_stoi, verbose=opts.verbose)
@@ -43,23 +44,44 @@ def train(opts: argparse.Namespace,
         print("\nEpoch {:d}".format(epoch + 1))
         print("============================================", flush=True)
 
-        i = 0
-        total_loss = 0.
-        running_loss = 0.
+        i: int = 0
+        n: int = len(dataset_train)
+        total_loss: torch.Tensor = 0.
+        running_loss: torch.Tensor = 0.
 
-        # Loop through training sentences.
+        # Shuffle dataset.
         dataset_train.shuffle()
-        for src, tgt in dataset_train:
+
+        # Loop through mini-batches.
+        while i < len(dataset_train):
             # Zero out the gradient.
             model.zero_grad()
 
-            # Compute the loss.
-            loss = model(*src, tgt)
-            total_loss += loss
-            running_loss += loss
+            # Loop through sentences in mini-batch.
+            batch_loss: torch.Tensor = 0.
+            for _ in range(min([opts.batch_size, n - i])):
+                src, tgt = dataset_train[i]
+
+                # Compute the loss.
+                loss = model(*src, tgt)
+                batch_loss += loss
+                total_loss += loss
+                running_loss += loss
+
+                # Log progress if necessary.
+                if opts.verbose and (i + 1) % opts.log_interval == 0:
+                    progress = 100 * (i + 1) / n
+                    duration = time.time() - running_time
+                    print("[{:6.2f}%] loss: {:10.5f}, duration: {:.2f} seconds"
+                          .format(progress, running_loss, duration), flush=True)
+                    running_loss = 0
+                    running_time = time.time()
+
+                i += 1
+            # >> End mini-batch.
 
             # Compute the gradient.
-            loss.backward()
+            batch_loss.backward()
 
             # Clip gradients.
             if opts.max_grad is not None:
@@ -68,16 +90,7 @@ def train(opts: argparse.Namespace,
 
             # Take a step.
             optimizer.step()
-
-            # Log progress if necessary.
-            if opts.verbose and (i + 1) % opts.log_interval == 0:
-                progress = 100 * (i + 1) / len(dataset_train)
-                duration = time.time() - running_time
-                print("[{:6.2f}%] loss: {:10.5f}, duration: {:.2f} seconds"
-                      .format(progress, running_loss, duration), flush=True)
-                running_loss = 0
-                running_time = time.time()
-            i += 1
+        # >> End mini-batches.
 
         epoch_duration = time.time() - epoch_start_time
         print("Loss: {:f}, duration: {:.0f} seconds"
@@ -94,6 +107,7 @@ def train(opts: argparse.Namespace,
                 preds = model.predict(*src)[0][0]
                 eval_stats.update(labs, preds)
             print(eval_stats, flush=True)
+    # >> End epochs.
 
     train_duration = time.time() - train_start_time
     print("Total time {:.0f} seconds".format(train_duration), flush=True)
@@ -140,9 +154,14 @@ def main(args: List[str] = None) -> None:
 
     # Parse the args again.
     opts = parser.parse_args(args=args)
-    device = torch.device("cuda" if opts.cuda else "cpu")
-    if not opts.cuda and torch.cuda.is_available():
-        print("Warning: CUDA is available, but you have not used the --cuda flag")
+
+    # Set the device to train on.
+    if opts.cuda:
+        device = torch.device("cuda", opts.gpu_id)
+    else:
+        if torch.cuda.is_available():
+            print("Warning: CUDA is available, but you have not used the --cuda flag")
+        device = torch.device("cpu")
 
     # Initialize the vocab and datasets.
     vocab = Vocab(cache=opts.vectors)

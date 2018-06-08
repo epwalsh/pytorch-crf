@@ -203,7 +203,7 @@ class LSTMCRF(nn.Module):
 
         """
         if lens is None:
-            lens = torch.tensor([words.size(0)])
+            lens = torch.tensor([words.size(0)], device=words.device)
         mask = sequence_mask(lens)
 
         # Gather word feats.
