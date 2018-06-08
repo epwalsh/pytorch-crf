@@ -37,13 +37,17 @@ def train(opts: argparse.Namespace,
     # Initialize evaluation metrics.
     eval_stats = ModelStats(model.vocab.labels_stoi, verbose=opts.verbose)
 
+    # Keep track of best epoch by loss.
+    best_loss: torch.Tensor = None
+    best_epoch: int = 0
+
     # Loop through epochs.
     train_start_time = time.time()
     for epoch in range(opts.epochs):
-        epoch_start_time = running_time = time.time()
         print("\nEpoch {:d}".format(epoch + 1))
-        print("============================================", flush=True)
+        print("==================================================", flush=True)
 
+        epoch_start_time = running_time = time.time()
         i: int = 0
         n: int = len(dataset_train)
         total_loss: torch.Tensor = 0.
@@ -92,9 +96,15 @@ def train(opts: argparse.Namespace,
             optimizer.step()
         # >> End mini-batches.
 
+        # Log the loss and duration of the epoch.
         epoch_duration = time.time() - epoch_start_time
         print("Loss: {:f}, duration: {:.0f} seconds"
               .format(total_loss, epoch_duration), flush=True)
+
+        # Update best loss.
+        if best_loss is None or total_loss < best_loss:
+            best_loss = total_loss
+            best_epoch = epoch
 
         # Update optimizer.
         optimizer.epoch_update()
@@ -106,11 +116,16 @@ def train(opts: argparse.Namespace,
                 labs = list(tgt.cpu().numpy())
                 preds = model.predict(*src)[0][0]
                 eval_stats.update(labs, preds)
+            eval_stats.compile(epoch)
             print(eval_stats, flush=True)
     # >> End epochs.
 
     train_duration = time.time() - train_start_time
-    print("Total time {:.0f} seconds".format(train_duration), flush=True)
+    print(f"Total time {train_duration:.0f} seconds", flush=True)
+    if dataset_valid:
+        print(f"Best epoch by f1: {eval_stats.best_epoch} ({eval_stats.best_f1:.4f})", flush=True)
+    else:
+        print(f"Best epoch by loss: {best_epoch} {best_loss:0.4f}")
 
 
 def main(args: List[str] = None) -> None:

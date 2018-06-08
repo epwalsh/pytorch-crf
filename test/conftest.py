@@ -39,6 +39,7 @@ def get_model_stats(vocab_dataset):
         model_stats = ModelStats(vocab_dataset[0].labels_stoi)
         for labels, preds in items:
             model_stats.update(labels, preds)
+        model_stats.compile(0)
         return model_stats
 
     return _get_model_stats
