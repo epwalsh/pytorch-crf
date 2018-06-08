@@ -6,10 +6,10 @@ from typing import List, Tuple
 import torch
 import torch.nn as nn
 
-from allennlp.modules.conditional_random_field import ConditionalRandomField
 from pycrf.io import Vocab
 from pycrf.nn.utils import sequence_mask
 from .char_lstm import CharLSTM
+from .crf import ConditionalRandomField
 
 
 class LSTMCRF(nn.Module):
