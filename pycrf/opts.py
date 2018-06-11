@@ -65,7 +65,7 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         help="""Path(s) to the training dataset(s)."""
     )
     group.add_argument(
-        "--valid",
+        "--validation",
         type=str,
         nargs="+",
         default=[],
@@ -74,7 +74,7 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
     group.add_argument(
         "-o", "--out",
         type=str,
-        required=require,
+        required=False,
         help="""Path to the file where the trained model should be saved."""
     )
     group.add_argument(
@@ -111,4 +111,9 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         type=int,
         default=1,
         help="""Mini batch size. Default is 1."""
+    )
+    group.add_argument(
+        "--results",
+        type=str,
+        help="""YAML file to append results to."""
     )

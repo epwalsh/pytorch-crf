@@ -1,6 +1,6 @@
 # pytorch-crf
 
-Yet another PyTorch implementation of a Bi-LSTM linear chain CRF
+A PyTorch implementation of a Bi-LSTM CRF with character-level features
 
 ## Requirements
 

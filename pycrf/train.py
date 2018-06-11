@@ -32,7 +32,7 @@ def train(opts: argparse.Namespace,
           optimizer: torch.optim.Optimizer,
           dataset_train: Dataset,
           dataset_valid: Dataset = None) -> None:
-    # pylint: disable=invalid-name,not-callable
+    # pylint: disable=invalid-name,not-callable,too-many-statements
     """Train a model on the given dataset."""
     # Initialize evaluation metrics.
     eval_stats = ModelStats(model.vocab.labels_stoi, verbose=opts.verbose)
@@ -120,12 +120,23 @@ def train(opts: argparse.Namespace,
             print(eval_stats, flush=True)
     # >> End epochs.
 
+    # Log results.
     train_duration = time.time() - train_start_time
     print(f"Total time {train_duration:.0f} seconds", flush=True)
     if dataset_valid:
         print(f"Best epoch by f1: {eval_stats.best_epoch} ({eval_stats.best_f1:.4f})", flush=True)
+        if opts.results:
+            with open(opts.results, "a") as resultsfile:
+                resultsfile.write("results:\n")
+                resultsfile.write(f"  best_epoch: {eval_stats.best_epoch}\n")
+                resultsfile.write(f"  best_f1: {eval_stats.best_f1:.4f}")
     else:
         print(f"Best epoch by loss: {best_epoch} {best_loss:0.4f}")
+        if opts.results:
+            with open(opts.results, "a") as resultsfile:
+                resultsfile.write("results:\n")
+                resultsfile.write(f"  best_epoch: {best_epoch}\n")
+                resultsfile.write(f"  best_loss: {best_loss:.4f}")
 
 
 def main(args: List[str] = None) -> None:
@@ -187,8 +198,8 @@ def main(args: List[str] = None) -> None:
         dataset_train.load_file(fname, vocab, device=device)
     print("Loaded {:d} sentences for training".format(len(dataset_train)),
           flush=True)
-    if opts.valid:
-        for fname in opts.valid:
+    if opts.validation:
+        for fname in opts.validation:
             dataset_valid.load_file(fname, vocab, device=device)
         print("Loaded {:d} sentences for validation"
               .format(len(dataset_valid)))
