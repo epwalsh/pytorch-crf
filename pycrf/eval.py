@@ -1,7 +1,14 @@
 """Evaluation statistics."""
 
+from enum import Enum
 from typing import Iterable, Dict, Set, List
 
+
+class Scheme(Enum):
+    """Enum class for labelling schemes."""
+
+    IOB = "iob"
+    IOBES = "iobes"
 
 
 def iob_to_spans(sequence: Iterable,
@@ -126,6 +133,15 @@ def iobes_to_spans(sequence: Iterable,
     return set(chunks)
 
 
+def _detect_label_scheme(labels: Iterable):
+    prefixes = [lab[:2] for lab in labels]
+    if all([x in ["O", "B-", "I-"] for x in prefixes]):
+        return Scheme.IOB
+    if all([x in ["O", "B-", "I-", "S-", "E-"] for x in prefixes]):
+        return Scheme.IOBES
+    raise ValueError("Unknown labelling scheme")
+
+
 class ModelStats:
     # pylint: disable=invalid-name
     """Aggregates statistics for a model on an evaluation set."""
@@ -142,6 +158,10 @@ class ModelStats:
         self.overlap_count = 0
         self.loss = loss
         self.epoch = epoch
+        self._scheme = \
+            _detect_label_scheme([lab for _, lab in labels_itos.items()])
+        self.span_getter = iob_to_spans \
+            if self._scheme == Scheme.IOB else iobes_to_spans
 
     @property
     def score(self):
@@ -151,9 +171,9 @@ class ModelStats:
         Returns the micro-average f1, precision, and recall for totally
         correct entities, as well accuracy by token.
         """
-        accuracy = self.correct_labels / self.total_labels
         if self.guess_count == 0:
-            return 0., 0., 0., accuracy
+            return 0., 0., 0., 0.
+        accuracy = self.correct_labels / self.total_labels
         precision = self.overlap_count / self.guess_count
         recall = self.overlap_count / self.gold_count
         if precision == 0.0 or recall == 0.0:
@@ -184,10 +204,10 @@ class ModelStats:
         self.correct_labels += \
             len([(l, p) for l, p in zip(gold_labels, predicted) if l == p])
 
-        gold_chunks = iob_to_spans(gold_labels, self.labels_itos)
+        gold_chunks = self.span_getter(gold_labels, self.labels_itos)
         self.gold_count += len(gold_chunks)
 
-        guess_chunks = iob_to_spans(predicted, self.labels_itos)
+        guess_chunks = self.span_getter(predicted, self.labels_itos)
         self.guess_count += len(guess_chunks)
 
         overlap_chunks = gold_chunks & guess_chunks

@@ -65,36 +65,43 @@ class Logger:
         print("Loss: {:f}, duration: {:.0f} seconds"
               .format(self.epoch_loss, epoch_duration), flush=True)
 
-    def end_train(self) -> None:
+    def end_train(self, validation: bool = False) -> None:
         """End round of training."""
         train_duration = time.time() - self.train_start_time
-        print(f"Total training time: {train_duration:.0f} seconds", flush=True)
+        print(f"Total training time: {train_duration:.0f} seconds\n", flush=True)
 
-        best_epoch = max(self.eval_stats, key=lambda x: (x.score[0], -1. * x.loss))
+        if validation:
+            best_epoch = max(self.eval_stats, key=lambda x: x.score)
+        else:
+            best_epoch = min(self.eval_stats, key=lambda x: x.loss)
 
         f1_score, precision, recall, accuracy = best_epoch.score
         loss = best_epoch.loss
 
-        print(f"Best epoch: {best_epoch.epoch+1:d}", flush=True)
-        if f1_score:
-            print(f"f1:        {f1_score:.4f}\n"
-                  f"precision: {precision:.4f}\n"
-                  f"recall:    {recall:.4f}\n"
-                  f"accuracy:  {accuracy:.4f}", flush=True)
-        print(f"  loss: {loss:.4f}")
+        print(f"Best epoch: {best_epoch.epoch+1:d}\n------------------", flush=True)
+        if validation:
+            print(f"f1:         {f1_score:.4f}\n"
+                  f"precision:  {precision:.4f}\n"
+                  f"recall:     {recall:.4f}\n"
+                  f"accuracy:   {accuracy:.4f}", flush=True)
+        print(f"loss:       {loss:.4f}")
 
         if self.results_file:
             with open(self.results_file, "a") as resultsfile:
                 resultsfile.write("results:\n")
                 resultsfile.write(f"  best_epoch: {best_epoch.epoch+1}\n")
-                resultsfile.write(f"  micro_avg_f1: {f1_score:f}\n")
-                resultsfile.write(f"  micro_avg_precision: {precision:f}\n")
-                resultsfile.write(f"  micro_avg_recall: {recall:f}\n")
+                if validation:
+                    resultsfile.write(f"  micro_avg_f1: {f1_score:f}\n")
+                    resultsfile.write(f"  micro_avg_precision: {precision:f}\n")
+                    resultsfile.write(f"  micro_avg_recall: {recall:f}\n")
                 resultsfile.write(f"  loss: {best_epoch.loss:f}\n")
 
-    def append_eval_stats(self, eval_stats: ModelStats) -> None:
+    def append_eval_stats(self,
+                          eval_stats: ModelStats,
+                          validation: bool = False) -> None:
         """Add another set of evaluation metrics."""
-        print(eval_stats, flush=True)
+        if validation:
+            print(eval_stats, flush=True)
         eval_stats.loss = self.epoch_loss
         self.eval_stats.append(eval_stats)
 

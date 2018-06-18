@@ -22,7 +22,7 @@ class CLOptim(ABC):
         """Initialize optimizer from command line options."""
         pass
 
-    def epoch_update(self) -> None:
+    def epoch_update(self, loss: float) -> None:
         """Do any updating (such as lr update) after each epoch."""
         pass
 
@@ -270,11 +270,16 @@ class SGD(torch.optim.SGD, CLOptim):
     def __init__(self,
                  params: Iterable,
                  decay_rate: float = 0.,
+                 decay_start: int = 0,
+                 decay_conditionally: bool = False,
                  **kwargs) -> None:
         super(SGD, self).__init__(params, **kwargs)
         self.decay_rate = decay_rate
+        self.decay_start = decay_start
+        self.decay_conditionally = decay_conditionally
         self.initial_lr: float = kwargs["lr"]
         self.epoch = 0
+        self.last_loss: float = None
 
     @staticmethod
     def cl_opts(parser: argparse.ArgumentParser) -> None:
@@ -311,6 +316,18 @@ class SGD(torch.optim.SGD, CLOptim):
             default=0.,
             help="""L2 penalty. Default is 0."""
         )
+        group.add_argument(
+            "--decay-start",
+            type=int,
+            default=0,
+            help="""Epoch to start decay at if loss doesn't decrease."""
+        )
+        group.add_argument(
+            "--decay-conditionally",
+            action="store_true",
+            help="""If set, learning rate decay will only happen when the loss
+            does not decrease from the previous round."""
+        )
         return None
 
     @classmethod
@@ -321,15 +338,19 @@ class SGD(torch.optim.SGD, CLOptim):
                    lr=opts.lr,
                    momentum=opts.momentum,
                    nesterov=opts.nesterov,
-                   weight_decay=opts.weight_decay)
+                   weight_decay=opts.weight_decay,
+                   decay_start=opts.decay_start,
+                   decay_conditionally=opts.decay_conditionally)
 
-    def epoch_update(self) -> None:
+    def epoch_update(self, loss: float) -> None:
         # pylint: disable=invalid-name,attribute-defined-outside-init
         """Update the learning rate."""
         self.epoch += 1
-        if self.decay_rate > 0:
-            self.lr = self.initial_lr / (1 + self.decay_rate * self.epoch)
-            print(f"Updating learning rate to {self.lr}", flush=True)
+        if self.decay_rate > 0 and self.decay_start <= self.epoch:
+            if not self.decay_conditionally or self.last_loss <= loss:
+                self.lr = self.initial_lr / (1 + self.decay_rate * self.epoch)
+                print(f"Updating learning rate to {self.lr}", flush=True)
+        self.last_loss = loss
 
 
 OPTIM_ALIASES: Dict[str, Type[CLOptim]] = {

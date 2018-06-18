@@ -124,7 +124,7 @@ def train(opts: argparse.Namespace,
         logger.end_epoch()
 
         # Update optimizer.
-        optimizer.epoch_update()
+        optimizer.epoch_update(logger.epoch_loss)
 
         # Gather eval stats.
         eval_stats = ModelStats(model.vocab.labels_itos, epoch)
@@ -138,14 +138,14 @@ def train(opts: argparse.Namespace,
                 preds = model.predict(*src)[0][0]
                 eval_stats.update(labs, preds)
 
-        logger.append_eval_stats(eval_stats)
+        logger.append_eval_stats(eval_stats, validation=bool(dataset_valid))
 
     # ==========================================================================
     # End epochs.
     # ==========================================================================
 
     # Log results.
-    logger.end_train()
+    logger.end_train(validation=bool(dataset_valid))
 
 
 def main(args: List[str] = None) -> None:
