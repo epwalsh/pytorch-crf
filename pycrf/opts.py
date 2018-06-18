@@ -1,13 +1,17 @@
 """Defines command-line options."""
 
 import argparse
+from typing import Type, Dict
 
-from .modules import LSTMCRF
+import torch
+
+from .modules import CharLSTM, CharCNN
 from .optim import OPTIM_ALIASES
 
 
-MODEL_ALIASES = {
-    "lstm_crf": LSTMCRF,
+MODEL_ALIASES: Dict[str, Type[torch.nn.Module]] = {
+    "lstm": CharLSTM,
+    "cnn": CharCNN,
 }
 
 
@@ -35,13 +39,6 @@ def base_opts(parser: argparse.ArgumentParser) -> None:
         help="""Control the amount of output printed to the terminal."""
     )
     group.add_argument(
-        "-m", "--model",
-        default="lstm_crf",
-        type=str,
-        choices=list(MODEL_ALIASES.keys()),
-        help="""The model to use."""
-    )
-    group.add_argument(
         "--cuda",
         action="store_true",
         help="""Use a cuda device."""
@@ -57,6 +54,13 @@ def base_opts(parser: argparse.ArgumentParser) -> None:
 def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
     """Add options specific to a training task."""
     group = parser.add_argument_group("Training options")
+    group.add_argument(
+        "--char-features",
+        default="lstm",
+        type=str,
+        choices=list(MODEL_ALIASES.keys()),
+        help="""The character-level feature generation layer to use."""
+    )
     group.add_argument(
         "--train",
         type=str,
@@ -116,4 +120,10 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         "--results",
         type=str,
         help="""YAML file to append results to."""
+    )
+    group.add_argument(
+        "--dropout",
+        type=float,
+        default=0.,
+        help="""Dropout probability."""
     )

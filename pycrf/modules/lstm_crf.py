@@ -8,7 +8,6 @@ import torch.nn as nn
 
 from pycrf.io import Vocab
 from pycrf.nn.utils import sequence_mask
-from .char_lstm import CharLSTM
 from .crf import ConditionalRandomField
 
 
@@ -22,8 +21,8 @@ class LSTMCRF(nn.Module):
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : pycrf.model.CharLSTM
-        The character-level LSTM layer.
+    char_feats_layer : pycrf.model.CharLSTM
+        The character-level feature-generating layer.
 
     crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
@@ -47,8 +46,11 @@ class LSTMCRF(nn.Module):
         The vocab object which contains a dict of known characters and word
         embeddings.
 
-    char_lstm : pycrf.model.CharLSTM
-        The character-level LSTM layer.
+    dropout : torch.nn.Dropout
+        Dropouts applied to various layers.
+
+    char_feats_layer : torch.nn.Module
+        The character-level feature generating layer.
 
     crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
@@ -67,7 +69,7 @@ class LSTMCRF(nn.Module):
 
     def __init__(self,
                  vocab: Vocab,
-                 char_lstm: CharLSTM,
+                 char_feats_layer: torch.nn.Module,
                  crf: ConditionalRandomField,
                  hidden_dim: int = 100,
                  layers: int = 1,
@@ -75,23 +77,25 @@ class LSTMCRF(nn.Module):
                  bidirectional: bool = True) -> None:
         super(LSTMCRF, self).__init__()
 
-        assert vocab.n_chars == char_lstm.n_chars
+        assert vocab.n_chars == char_feats_layer.n_chars
         assert vocab.n_labels == crf.num_tags
 
         self.vocab = vocab
-        self.char_lstm = char_lstm
-        self.crf = crf
+        self.dropout = nn.Dropout(p=dropout) if dropout else None
 
-        # Recurrent layer. Takes as input the concatenation of the char_lstm
-        # final hidden state and pre-trained embedding for each word.
-        # The dimension of the output is given by self.rnn_output_size (see
-        # below).
+        # Layer for generating character-level word features.
+        self.char_feats_layer = char_feats_layer
+
+        # Recurrent layer. Takes as input the concatenation of the
+        # char_feats_layer final hidden state and pre-trained embedding for
+        # each word. The dimension of the output is given by
+        # self.rnn_output_size (see below).
         self.rnn = nn.LSTM(
-            input_size=vocab.word_vec_dim + char_lstm.output_size,
+            input_size=vocab.word_vec_dim + char_feats_layer.output_size,
             hidden_size=hidden_dim,
             num_layers=layers,
             bidirectional=bidirectional,
-            dropout=dropout,
+            dropout=dropout if layers > 1 else 0,
             batch_first=True,
         )
 
@@ -104,6 +108,9 @@ class LSTMCRF(nn.Module):
         # time step and transforms into scores for each label.
         self.rnn_to_crf = nn.Linear(self.rnn_output_size, self.vocab.n_labels)
 
+        # Conditional Random Field that maps word features into labels.
+        self.crf = crf
+
     def _feats(self,
                words: torch.Tensor,
                word_lengths: torch.Tensor,
@@ -113,9 +120,10 @@ class LSTMCRF(nn.Module):
         Generate features for the CRF from input.
 
         First we generate a vector for each word by running each word
-        char-by-char through the char_lstm and then concatenating those final
-        hidden states for each word with the pre-trained embedding of the word.
-        That word vector is than ran through the RNN and then the linear layer.
+        char-by-char through the char_feats_layer and then concatenating those
+        final hidden states for each word with the pre-trained embedding of the
+        word. That word vector is than ran through the RNN and then the linear
+        layer.
 
         Parameters
         ----------
@@ -142,22 +150,30 @@ class LSTMCRF(nn.Module):
         """
         # Run each word character-by-character through the CharLSTM to generate
         # character-level word features.
-        char_feats = self.char_lstm(words, word_lengths, word_indices)
-        # char_feats: ``[sent_length x char_lstm.output_size]``
+        char_feats = self.char_feats_layer(words, word_lengths, word_indices)
+        # char_feats: ``[sent_length x char_feats_layer.output_size]``
 
         # Concatenate the character-level word features and word embeddings.
         word_feats = torch.cat([char_feats, word_embs], dim=-1)
         # word_feats: ``[sent_length x
-        #                (char_lstm.output_size + vocab.word_vec_dim)]``
+        #                (char_feats_layer.output_size + vocab.word_vec_dim)]``
 
         # Add a fake batch dimension.
         word_feats = word_feats.unsqueeze(0)
         # word_feats: ``[1 x sent_length x
-        #                (char_lstm.output_size + vocab.word_vec_dim)]``
+        #                (char_feats_layer.output_size + vocab.word_vec_dim)]``
+
+        # Apply dropout.
+        if self.dropout:
+            word_feats = self.dropout(word_feats)
 
         # Run word features through the LSTM.
         lstm_feats, _ = self.rnn(word_feats)
         # lstm_feats: ``[1 x sent_length x rnn_output_size]``
+
+        # Apply dropout.
+        if self.dropout:
+            lstm_feats = self.dropout(lstm_feats)
 
         # Run recurrent output through linear layer to generate the by-label
         # features.
@@ -282,11 +298,13 @@ class LSTMCRF(nn.Module):
             help="""Dimension of the hidden layer for the word-level
             features LSTM. Default is 50."""
         )
-        CharLSTM.cl_opts(parser)
 
     @classmethod
-    def cl_init(cls, opts: argparse.Namespace, vocab: Vocab):
+    def cl_init(cls,
+                opts: argparse.Namespace, vocab: Vocab,
+                char_feats_layer: torch.nn.Module):
         """Initialize an instance of this model from command-line options."""
         crf = ConditionalRandomField(vocab.n_labels)
-        char_lstm = CharLSTM.cl_init(opts, vocab)
-        return cls(vocab, char_lstm, crf, hidden_dim=opts.hidden_dim)
+        return cls(vocab, char_feats_layer, crf,
+                   hidden_dim=opts.hidden_dim,
+                   dropout=opts.dropout)

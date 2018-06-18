@@ -4,7 +4,7 @@ import argparse
 
 import torch
 import torch.nn as nn
-from torch.nn import LSTM, Embedding
+from torch.nn import LSTM, Embedding, Dropout
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from pycrf.io import Vocab
@@ -30,7 +30,7 @@ class CharLSTM(nn.Module):
         The number of cell layers.
 
     dropout : float, optional (default: 0.)
-        The dropout probability for the recurrent layer.
+        The dropout probability for the recurrent layer and embedding layer.
 
     embedding_size : int, optional (default: 50)
         The size of the embedding layer.
@@ -47,10 +47,13 @@ class CharLSTM(nn.Module):
         The dimension of the output, which is
         ``layers * hidden_size * directions``.
 
-    embedding : torch.nn
+    embedding : torch.nn.Embedding
         The character embedding layer.
 
-    rnn : torch.nn
+    embedding_dropout : torch.nn.Dropout
+        A dropout applied to the embedding features.
+
+    rnn : torch.nn.LSTM
         The LSTM layer.
 
     """
@@ -66,18 +69,27 @@ class CharLSTM(nn.Module):
         super(CharLSTM, self).__init__()
 
         self.n_chars = n_chars
+
+        # Character embedding layer.
         self.embedding = \
             Embedding(self.n_chars, embedding_size, padding_idx=padding_idx)
-        self.output_size = layers * hidden_size
-        if bidirectional:
-            self.output_size *= 2
 
+        # Dropout applied to embeddings.
+        self.embedding_dropout = \
+            Dropout(p=dropout) if dropout else None
+
+        # Recurrent layer.
         self.rnn = LSTM(input_size=embedding_size,
                         hidden_size=hidden_size,
                         num_layers=layers,
                         batch_first=True,
-                        dropout=dropout,
+                        dropout=dropout if layers > 1 else 0,
                         bidirectional=bidirectional)
+
+        # Calculate final output size.
+        self.output_size = layers * hidden_size
+        if bidirectional:
+            self.output_size *= 2
 
     def forward(self,
                 inputs: torch.Tensor,
@@ -112,6 +124,10 @@ class CharLSTM(nn.Module):
         inputs_emb = self.embedding(inputs)
         # inputs_emb: ``[sent_length x max_word_length x embedding_size]``
 
+        # Apply dropout to embeddings.
+        if self.embedding_dropout:
+            inputs_emb = self.embedding_dropout(inputs_emb)
+
         # Turned the padded inputs into a packed sequence.
         packed = pack_padded_sequence(inputs_emb, lengths, batch_first=True)
 
@@ -138,7 +154,7 @@ class CharLSTM(nn.Module):
             type=int,
             default=50,
             help="""Dimension of the hidden layer for the character-level
-            features LSTM. Default is 50."""
+            LSTM. Default is 50."""
         )
         group.add_argument(
             "--char-embedding-size",
@@ -152,4 +168,5 @@ class CharLSTM(nn.Module):
         """Initialize an instance of this model from command-line options."""
         return cls(vocab.n_chars,
                    opts.char_hidden_dim,
-                   embedding_size=opts.char_embedding_size)
+                   embedding_size=opts.char_embedding_size,
+                   dropout=opts.dropout)

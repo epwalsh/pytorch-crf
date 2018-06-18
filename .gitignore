@@ -110,7 +110,7 @@ scratch*
 .vector_cache
 
 # log files
-log*
+log
 *.log
 
 # model files

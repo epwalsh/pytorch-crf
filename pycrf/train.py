@@ -16,13 +16,14 @@ You can see all of the options available for training a specific model with:
 """
 
 import argparse
-import time
 from typing import List
 
 import torch
 
 from .eval import ModelStats
 from .io import Vocab, Dataset
+from .logging import Logger
+from .modules import LSTMCRF
 from .optim import OPTIM_ALIASES
 from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
 
@@ -32,57 +33,77 @@ def train(opts: argparse.Namespace,
           optimizer: torch.optim.Optimizer,
           dataset_train: Dataset,
           dataset_valid: Dataset = None) -> None:
-    # pylint: disable=invalid-name,not-callable,too-many-statements
-    """Train a model on the given dataset."""
-    # Initialize evaluation metrics.
-    eval_stats = ModelStats(model.vocab.labels_stoi, verbose=opts.verbose)
+    """
+    Train a model on the given dataset.
 
-    # Keep track of best epoch by loss.
-    best_loss: torch.Tensor = None
-    best_epoch: int = 0
+    Parameters
+    ----------
+    opts : argparse.Namespace
+        The command-line options.
 
+    model : torch.nn.Module
+        The model to train.
+
+    optimizer : torch.optim.Optimizer
+        The optimizer to train with.
+
+    dataset_train : Dataset
+        The training dataset.
+
+    dataset_valid : Dataset, optional
+        A validation dataset which will be evaluated at the end of each epoch.
+
+    Returns
+    -------
+    None
+
+    """
+    # Initialize logger.
+    n_examples = len(dataset_train)
+    logger = Logger(n_examples,
+                    log_interval=opts.log_interval,
+                    verbose=opts.verbose, results_file=opts.results)
+
+    # ==========================================================================
     # Loop through epochs.
-    train_start_time = time.time()
-    for epoch in range(opts.epochs):
-        print("\nEpoch {:d}".format(epoch + 1))
-        print("==================================================", flush=True)
+    # ==========================================================================
 
-        epoch_start_time = running_time = time.time()
-        i: int = 0
-        n: int = len(dataset_train)
-        total_loss: torch.Tensor = 0.
-        running_loss: torch.Tensor = 0.
+    for epoch in range(opts.epochs):
+        logger.start_epoch()
 
         # Shuffle dataset.
         dataset_train.shuffle()
 
-        # Loop through mini-batches.
-        while i < len(dataset_train):
+        # Set model to train mode.
+        model.train()
+
+        # ======================================================================
+        # Loop through all mini-batches.
+        # ======================================================================
+
+        iteration = 0
+        while iteration < len(dataset_train):
             # Zero out the gradient.
             model.zero_grad()
 
+            # ==================================================================
             # Loop through sentences in mini-batch.
+            # ==================================================================
+
             batch_loss: torch.Tensor = 0.
-            for _ in range(min([opts.batch_size, n - i])):
-                src, tgt = dataset_train[i]
+            for _ in range(min([opts.batch_size, n_examples - iteration])):
+                src, tgt = dataset_train[iteration]
 
                 # Compute the loss.
                 loss = model(*src, tgt)
                 batch_loss += loss
-                total_loss += loss
-                running_loss += loss
 
-                # Log progress if necessary.
-                if opts.verbose and (i + 1) % opts.log_interval == 0:
-                    progress = 100 * (i + 1) / n
-                    duration = time.time() - running_time
-                    print("[{:6.2f}%] loss: {:10.5f}, duration: {:.2f} seconds"
-                          .format(progress, running_loss, duration), flush=True)
-                    running_loss = 0
-                    running_time = time.time()
+                logger.update(iteration, loss)
+                iteration += 1
 
-                i += 1
-            # >> End mini-batch.
+            # ==================================================================
+            # End mini-batch.
+            # ==================================================================
 
             # Compute the gradient.
             batch_loss.backward()
@@ -94,49 +115,37 @@ def train(opts: argparse.Namespace,
 
             # Take a step.
             optimizer.step()
-        # >> End mini-batches.
+
+        # ======================================================================
+        # End all mini-batches.
+        # ======================================================================
 
         # Log the loss and duration of the epoch.
-        epoch_duration = time.time() - epoch_start_time
-        print("Loss: {:f}, duration: {:.0f} seconds"
-              .format(total_loss, epoch_duration), flush=True)
-
-        # Update best loss.
-        if best_loss is None or total_loss < best_loss:
-            best_loss = total_loss
-            best_epoch = epoch
+        logger.end_epoch()
 
         # Update optimizer.
         optimizer.epoch_update()
 
+        # Gather eval stats.
+        eval_stats = ModelStats(model.vocab.labels_itos, epoch)
+
         # Evaluate on validation set.
         if dataset_valid:
-            eval_stats.reset()
+            # Put model into evaluation mode.
+            model.eval()
             for src, tgt in dataset_valid:
                 labs = list(tgt.cpu().numpy())
                 preds = model.predict(*src)[0][0]
                 eval_stats.update(labs, preds)
-            eval_stats.compile(epoch)
-            print(eval_stats, flush=True)
-    # >> End epochs.
+
+        logger.append_eval_stats(eval_stats)
+
+    # ==========================================================================
+    # End epochs.
+    # ==========================================================================
 
     # Log results.
-    train_duration = time.time() - train_start_time
-    print(f"Total time {train_duration:.0f} seconds", flush=True)
-    if dataset_valid:
-        print(f"Best epoch by f1: {eval_stats.best_epoch} ({eval_stats.best_f1:.4f})", flush=True)
-        if opts.results:
-            with open(opts.results, "a") as resultsfile:
-                resultsfile.write("results:\n")
-                resultsfile.write(f"  best_epoch: {eval_stats.best_epoch}\n")
-                resultsfile.write(f"  best_f1: {eval_stats.best_f1:.4f}")
-    else:
-        print(f"Best epoch by loss: {best_epoch} {best_loss:0.4f}")
-        if opts.results:
-            with open(opts.results, "a") as resultsfile:
-                resultsfile.write("results:\n")
-                resultsfile.write(f"  best_epoch: {best_epoch}\n")
-                resultsfile.write(f"  best_loss: {best_loss:.4f}")
+    logger.end_train()
 
 
 def main(args: List[str] = None) -> None:
@@ -170,8 +179,9 @@ def main(args: List[str] = None) -> None:
     optim_class.cl_opts(parser)
 
     # Add model-specific options.
-    model_class = MODEL_ALIASES[initial_opts.model]
-    model_class.cl_opts(parser)
+    LSTMCRF.cl_opts(parser)
+    char_feats_class = MODEL_ALIASES[initial_opts.char_features]
+    char_feats_class.cl_opts(parser)
 
     # Check if we should display the help message and exit.
     if initial_opts.help:
@@ -206,7 +216,8 @@ def main(args: List[str] = None) -> None:
     print("Training on labels:", list(vocab.labels_stoi.keys()))
 
     # Initialize the model.
-    model = model_class.cl_init(opts, vocab).to(device)
+    char_feats_layer = char_feats_class.cl_init(opts, vocab).to(device)
+    model = LSTMCRF.cl_init(opts, vocab, char_feats_layer).to(device)
     print(model, flush=True)
 
     # Initialize the optimizer.
