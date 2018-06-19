@@ -117,3 +117,6 @@ training/logs/*
 # model files
 *.yml
 *.yaml
+
+# checkpoints
+*.pt

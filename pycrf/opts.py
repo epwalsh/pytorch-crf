@@ -132,3 +132,8 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         default=0.,
         help="""Dropout probability."""
     )
+    group.add_argument(
+        "--checkpoint",
+        type=str,
+        help="""A checkpoint file to start training from."""
+    )

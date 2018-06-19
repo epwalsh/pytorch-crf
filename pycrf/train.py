@@ -29,6 +29,21 @@ from .optim import OPTIM_ALIASES
 from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
 
 
+
+def save_checkpoint(model: torch.nn.Module,
+                    optimizer: torch.optim.Optimizer,
+                    path: str,
+                    epoch: int) -> None:
+    """Save a training checkpoint."""
+    new_path = f"{path}_epoch_{epoch+1:03d}.pt"
+    print(f"Saving checkpoint to {new_path}")
+    torch.save({
+        "epoch": epoch + 1,
+        "state_dict": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+    }, new_path)
+
+
 def train(opts: argparse.Namespace,
           model: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
@@ -67,12 +82,22 @@ def train(opts: argparse.Namespace,
                     results_file=opts.results,
                     log_dir=opts.log_dir)
 
+    # Load checkpoint if given.
+    if opts.checkpoint:
+        checkpoint = torch.load(opts.checkpoint)
+        start_epoch = checkpoint["epoch"]
+        model.load_state_dict(checkpoint["state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        print(f"Loaded model checkpoint {opts.checkpoint}")
+    else:
+        start_epoch = 0
+
     # ==========================================================================
     # Loop through epochs.
     # ==========================================================================
 
-    for epoch in range(opts.epochs):
-        logger.start_epoch()
+    for epoch in range(start_epoch, opts.epochs):
+        logger.start_epoch(epoch)
 
         # Shuffle dataset.
         dataset_train.shuffle()
@@ -101,7 +126,7 @@ def train(opts: argparse.Namespace,
                 loss = model(*src, tgt)
                 batch_loss += loss
 
-                logger.update(iteration, loss, model.named_parameters())
+                logger.update(epoch, iteration, loss, model.named_parameters())
                 iteration += 1
 
             # ==================================================================
@@ -142,6 +167,10 @@ def train(opts: argparse.Namespace,
                 eval_stats.update(labs, preds)
 
         logger.append_eval_stats(eval_stats, validation=bool(dataset_valid))
+
+        # Save checkpoint.
+        if opts.out:
+            save_checkpoint(model, optimizer, opts.out, epoch)
 
     # ==========================================================================
     # End epochs.

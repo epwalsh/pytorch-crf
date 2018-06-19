@@ -57,11 +57,6 @@ class Logger:
         else:
             self.writer = None
 
-    @property
-    def current_epoch(self):
-        """Return current epoch number."""
-        return len(self.eval_stats)
-
     def scalar_summary(self, tag: str, value: float, step: int) -> None:
         """Log a scalar variable."""
         if self.writer is None:
@@ -107,9 +102,9 @@ class Logger:
 
         return None
 
-    def start_epoch(self) -> None:
+    def start_epoch(self, epoch: int) -> None:
         """Log start of epoch."""
-        print("\nEpoch {:d}".format(self.current_epoch + 1))
+        print(f"\nEpoch {epoch+1:d}")
         print("==================================================", flush=True)
         self.epoch_loss = 0.
         self.running_loss = 0.
@@ -168,9 +163,13 @@ class Logger:
         self.eval_stats.append(eval_stats)
         if self.writer is not None:
             for tag, value in info.items():
-                self.scalar_summary(tag, value, self.current_epoch)
+                self.scalar_summary(tag, value, eval_stats.epoch + 1)
 
-    def update(self, iteration: int, loss: torch.Tensor, params: dict):
+    def update(self,
+               epoch: int,
+               iteration: int,
+               loss: torch.Tensor,
+               params: dict):
         """Update loss."""
         self.epoch_loss += loss.item()
         self.running_loss += loss.item()
@@ -182,7 +181,7 @@ class Logger:
                   .format(progress, self.running_loss, duration), flush=True)
 
             if self.writer is not None:
-                step = self.current_epoch * self.n_examples + iteration + 1
+                step = epoch * self.n_examples + iteration + 1
                 if self.log_weights:
                     for tag, value in params:
                         if not value.requires_grad:
