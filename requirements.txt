@@ -1,6 +1,7 @@
 torchtext
 numpy
 tensorflow
+tensorboard
 pytest
 pytest-cov
 mypy

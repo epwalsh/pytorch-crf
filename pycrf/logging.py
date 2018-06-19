@@ -156,14 +156,14 @@ class Logger:
                           eval_stats: ModelStats,
                           validation: bool = False) -> None:
         """Add another set of evaluation metrics."""
-        info = {"loss": self.epoch_loss}
+        info = {"train/loss": self.epoch_loss}
         if validation:
             print(eval_stats, flush=True)
             score = eval_stats.score
-            info["f1"] = score[0]
-            info["precision"] = score[1]
-            info["recall"] = score[2]
-            info["accuracy"] = score[3]
+            info["validation/f1"] = score[0]
+            info["validation/precision"] = score[1]
+            info["validation/recall"] = score[2]
+            info["validation/accuracy"] = score[3]
         eval_stats.loss = self.epoch_loss
         self.eval_stats.append(eval_stats)
         if self.writer is not None:
