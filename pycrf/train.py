@@ -62,7 +62,9 @@ def train(opts: argparse.Namespace,
     n_examples = len(dataset_train)
     logger = Logger(n_examples,
                     log_interval=opts.log_interval,
-                    verbose=opts.verbose, results_file=opts.results)
+                    verbose=opts.verbose,
+                    results_file=opts.results,
+                    log_dir=opts.log_dir)
 
     # ==========================================================================
     # Loop through epochs.
@@ -98,7 +100,7 @@ def train(opts: argparse.Namespace,
                 loss = model(*src, tgt)
                 batch_loss += loss
 
-                logger.update(iteration, loss)
+                logger.update(iteration, loss, model.named_parameters())
                 iteration += 1
 
             # ==================================================================

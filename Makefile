@@ -1,4 +1,6 @@
 test = ./test/
+logdir = ./training/logs
+port = 6006
 
 PYTHON_VERSION := `grep "python:" Dockerfile | head -1 | sed -r 's/.*([0-9]\.[0-9]).*/\1/g'`
 IMAGE_TAG      := python$(PYTHON_VERSION)
@@ -37,3 +39,12 @@ test : typecheck lint unit-test
 create-branch :
 	git checkout -b ISSUE-$(num)
 	git push --set-upstream origin ISSUE-$(num)
+
+.PHONY : tensor-board
+tensor-board :
+	@google-chrome http://localhost:$(port)
+	tensorboard --logdir=$(logdir) --port=$(port)
+
+.PHONY : clean
+clean :
+	@rm -f ./training/logs/*

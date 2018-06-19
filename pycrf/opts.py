@@ -99,6 +99,11 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         help="""Log progress after processing this many batches."""
     )
     group.add_argument(
+        "--log-dir",
+        type=str,
+        help="""Directory to log progress to."""
+    )
+    group.add_argument(
         "--optim",
         type=str,
         default="SGD",

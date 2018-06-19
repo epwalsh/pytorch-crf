@@ -271,12 +271,12 @@ class SGD(torch.optim.SGD, CLOptim):
                  params: Iterable,
                  decay_rate: float = 0.,
                  decay_start: int = 0,
-                 decay_conditionally: bool = False,
+                 conditional_decay: bool = False,
                  **kwargs) -> None:
         super(SGD, self).__init__(params, **kwargs)
         self.decay_rate = decay_rate
         self.decay_start = decay_start
-        self.decay_conditionally = decay_conditionally
+        self.conditional_decay = conditional_decay
         self.initial_lr: float = kwargs["lr"]
         self.epoch = 0
         self.last_loss: float = None
@@ -323,7 +323,7 @@ class SGD(torch.optim.SGD, CLOptim):
             help="""Epoch to start decay at if loss doesn't decrease."""
         )
         group.add_argument(
-            "--decay-conditionally",
+            "--conditional-decay",
             action="store_true",
             help="""If set, learning rate decay will only happen when the loss
             does not decrease from the previous round."""
@@ -340,14 +340,14 @@ class SGD(torch.optim.SGD, CLOptim):
                    nesterov=opts.nesterov,
                    weight_decay=opts.weight_decay,
                    decay_start=opts.decay_start,
-                   decay_conditionally=opts.decay_conditionally)
+                   conditional_decay=opts.conditional_decay)
 
     def epoch_update(self, loss: float) -> None:
         # pylint: disable=invalid-name,attribute-defined-outside-init
         """Update the learning rate."""
         self.epoch += 1
         if self.decay_rate > 0 and self.decay_start <= self.epoch:
-            if not self.decay_conditionally or self.last_loss <= loss:
+            if not self.conditional_decay or self.last_loss <= loss:
                 self.lr = self.initial_lr / (1 + self.decay_rate * self.epoch)
                 print(f"Updating learning rate to {self.lr}", flush=True)
         self.last_loss = loss

@@ -112,6 +112,7 @@ scratch*
 # log files
 log
 *.log
+training/logs/*
 
 # model files
 *.yml

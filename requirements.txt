@@ -1,4 +1,6 @@
 torchtext
+numpy
+tensorflow
 pytest
 pytest-cov
 mypy
