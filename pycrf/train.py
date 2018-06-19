@@ -19,6 +19,7 @@ import argparse
 from typing import List
 
 import torch
+import torchtext
 
 from .eval import ModelStats
 from .io import Vocab, Dataset
@@ -201,8 +202,11 @@ def main(args: List[str] = None) -> None:
             print("Warning: CUDA is available, but you have not used the --cuda flag")
         device = torch.device("cpu")
 
-    # Initialize the vocab and datasets.
-    vocab = Vocab(cache=opts.vectors)
+    # Load pretrained word embeddings and initialize vocab.
+    glove = torchtext.vocab.GloVe(name="6B", dim=opts.word_vec_dim, cache=opts.vectors)
+    vocab = Vocab(glove.stoi, glove.itos)
+
+    # Load datasets.
     print("Loading datasets", flush=True)
     dataset_train = Dataset()
     dataset_valid = Dataset()
@@ -219,7 +223,7 @@ def main(args: List[str] = None) -> None:
 
     # Initialize the model.
     char_feats_layer = char_feats_class.cl_init(opts, vocab).to(device)
-    model = LSTMCRF.cl_init(opts, vocab, char_feats_layer).to(device)
+    model = LSTMCRF.cl_init(opts, vocab, char_feats_layer, glove.vectors).to(device)
     print(model, flush=True)
 
     # Initialize the optimizer.

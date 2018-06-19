@@ -30,15 +30,10 @@ def test_chars(vocab_dataset):
 
 
 def test_words(vocab_dataset):
-    """Check to make sure the GloVe attr was initialized correctly."""
+    """Check to make sure word dicts were initialized correctly."""
     vocab = vocab_dataset[0]
     assert vocab.n_words > 10000
-
-
-def test_vectors(vocab_dataset):
-    """Check that the word embedding vectors look like they're supposed to."""
-    vocab = vocab_dataset[0]
-    assert vocab.glove.vectors[0].size()[0] == vocab.word_vec_dim
+    assert vocab.words_itos[vocab.words_stoi["hi"]] == "hi"
 
 
 cases = [
@@ -63,7 +58,7 @@ def test_sent2tensor(vocab_dataset, sent):
     assert isinstance(char_tensors, torch.Tensor)
     assert list(char_tensors.size()) == [len(sent), max(check_lens)]
     assert isinstance(word_tensors, torch.Tensor)
-    assert list(word_tensors.size()) == [len(sent), vocab.word_vec_dim]
+    assert list(word_tensors.size()) == [len(sent)]
 
     # Verify order of word lengths and idxs.
     assert_equal(word_lengths, torch.tensor(check_sorted_lens))

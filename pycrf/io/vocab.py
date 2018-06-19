@@ -1,10 +1,9 @@
 """Defines a class for holding a vocabulary set."""
 
 import string
-from typing import List, Tuple, Type
+from typing import List, Tuple, Type, Dict
 
 import torch
-import torchtext
 
 from pycrf.nn.utils import sort_and_pad
 
@@ -22,6 +21,12 @@ class Vocab:
 
     Parameters
     ----------
+    words_stoi : dict
+        Keys are lowercase words, values and ints.
+
+    words_itos : dict
+        Keys are ints, values are lowercase words.
+
     labels : list of str
         List of valid token labels that we expect to see in the datasets.
 
@@ -36,14 +41,6 @@ class Vocab:
 
     pad_char : str
         The code to use for padding chars.
-
-    word_vec_dim : int
-        The dimension of the vector word embedding. As of now, can only be 50,
-        100, 200, or 300.
-
-    cache : str
-        Optional path to GloVe cache. If not given and the cache cannot be
-        found automatically, the GloVe embeddings will be downloaded.
 
     Attributes
     ----------
@@ -68,25 +65,28 @@ class Vocab:
     pad_char : str
         The code to use for padding chars.
 
-    glove : :obj:``torchtext.vocab.GloVe``
-        GloVe word embeddings.
-
     chars_stoi : dict
         Keys are chars, values are unique ids (int).
 
     chars_itos : dict
         Keys are ids (int), values are chars.
 
+    words_stoi : dict
+        Keys are lowercase words, values and ints.
+
+    words_itos : dict
+        Keys are ints, values are lowercase words.
+
     """
 
     def __init__(self,
+                 words_stoi: Dict[str, int],
+                 words_itos: Dict[int, str],
                  labels: List[str] = None,
                  default_label: str = "O",
                  unk_term: str = "UNK",
                  pad_char: str = "PAD",
-                 unk_char: str = "UNK",
-                 word_vec_dim: int = 100,
-                 cache: str = None) -> None:
+                 unk_char: str = "UNK") -> None:
         self.default_label = default_label
         self.labels_stoi = {default_label: 0}
         self.labels_itos = {0: default_label}
@@ -94,14 +94,10 @@ class Vocab:
         self.unk_term = unk_term
         self.unk_char = unk_char
         self.pad_char = pad_char
-
-        self.word_vec_dim = word_vec_dim
-
         self.chars_stoi = {pad_char: 0, unk_char: 1}
         self.chars_itos = {0: pad_char, 1: unk_char}
-
-        self.glove = torchtext.vocab.GloVe(
-            name="6B", dim=self.word_vec_dim, cache=cache)
+        self.words_stoi = words_stoi
+        self.words_itos = words_itos
 
         for lab in labels or []:
             ind = self.labels_stoi.setdefault(lab, len(self.labels_stoi))
@@ -118,7 +114,7 @@ class Vocab:
     @property
     def n_words(self) -> int:
         """Get the number of words."""
-        return len(self.glove.stoi)
+        return len(self.words_stoi)
 
     @property
     def n_chars(self) -> int:
@@ -151,40 +147,40 @@ class Vocab:
             A tuple where the first item is the sorted words in their character
             representation. The second item is the lengths of those words as
             defined by the number of characters. The third item is the sorted
-            ids of the words so that the original order can be retained, and the
-            fourth is an unsorted tensor of word embeddings.
+            indices of the words so that the original order can be retained,
+            and the fourth is an unsorted tensor of word ids.
 
         """
         # Encode words and characters.
         word_lengths_list: List[int] = []           # length of each word.
-        word_vec_emb_list: List[torch.Tensor] = []  # words represented by their vector embedding.
+        word_idx_list: List[torch.Tensor] = []  # words represented by their vector embedding.
         word_tensors_list: List[torch.Tensor] = []  # words represented by their characters.
         for tok in sent:
             word_lengths_list.append(len(tok))
-            word_vec_emb_list.append(
-                self.glove[self.glove.stoi.get(tok.lower(), -1)])
             tmp = torch.tensor([
                 self.chars_stoi.get(char, self.chars_stoi[self.unk_char])
                 for char in tok
             ])
             word_tensors_list.append(tmp)
+            word_idx_list.append(
+                self.words_stoi.get(tok.lower(), self.words_stoi[self.unk_term.lower()]))
 
         # Convert into tensors.
         word_lengths = torch.tensor(word_lengths_list)
-        word_vec_emb = torch.cat(word_vec_emb_list, dim=0)
+        word_idxs = torch.tensor(word_idx_list)
         # Words are sorted and padded by word length.
         word_tensors, lens, idxs = \
             sort_and_pad(word_tensors_list, word_lengths)
 
         # Send to device (like a cuda device) if device was given.
         if device is not None:
-            word_tensors, lens, idxs, word_vec_emb = \
+            word_tensors, lens, idxs, word_idxs = \
                 word_tensors.to(device), \
                 lens.to(device), \
                 idxs.to(device), \
-                word_vec_emb.to(device)
+                word_idxs.to(device)
 
-        return word_tensors, lens, idxs, word_vec_emb
+        return word_tensors, lens, idxs, word_idxs
 
     def labs2tensor(self,
                     labs: List[str],

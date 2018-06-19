@@ -17,16 +17,16 @@ def test_source(vocab_dataset):
 
     # Check the first item, which comes from the sentence:
     # [("hi", "O"), ("there", "O")]
-    words, word_lens, word_idxs, word_embs = dataset.source[0]
+    words, word_lens, idxs, word_idxs = dataset.source[0]
     assert isinstance(words, torch.Tensor)
     assert isinstance(word_lens, torch.Tensor)
+    assert isinstance(idxs, torch.Tensor)
     assert isinstance(word_idxs, torch.Tensor)
-    assert isinstance(word_embs, torch.Tensor)
 
     assert list(words.size()) == [2, 5]
     assert_equal(word_lens, torch.tensor([5, 2]))
-    assert_equal(word_idxs, torch.tensor([1, 0]))
-    assert list(word_embs.size()) == [2, vocab.word_vec_dim]
+    assert_equal(idxs, torch.tensor([1, 0]))
+    assert list(word_idxs.size()) == [2]
 
 
 def test_target(vocab_dataset):

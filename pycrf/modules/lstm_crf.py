@@ -27,6 +27,9 @@ class LSTMCRF(nn.Module):
     crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
 
+    word_vecs : torch.Tensor
+        Pre-trained word vectors with shape ``[vocab_size x embedding_dimension]``.
+
     hidden_dim : int, optional (default: 100)
         The hidden dimension of the recurrent layer.
 
@@ -40,6 +43,9 @@ class LSTMCRF(nn.Module):
         If True, bidirectional recurrent layer is used, otherwise single
         direction.
 
+    freeze_embeddings : bool, optional (default: True)
+        If True, word embeddings will not be updated during training.
+
     Attributes
     ----------
     vocab : pycrf.io.Vocab
@@ -48,6 +54,9 @@ class LSTMCRF(nn.Module):
 
     dropout : torch.nn.Dropout
         Dropouts applied to various layers.
+
+    word_embedding : torch.nn.Embedding
+        The word vector embedding layer.
 
     char_feats_layer : torch.nn.Module
         The character-level feature generating layer.
@@ -71,14 +80,17 @@ class LSTMCRF(nn.Module):
                  vocab: Vocab,
                  char_feats_layer: torch.nn.Module,
                  crf: ConditionalRandomField,
+                 word_vecs: torch.Tensor,
                  hidden_dim: int = 100,
                  layers: int = 1,
                  dropout: float = 0.,
-                 bidirectional: bool = True) -> None:
+                 bidirectional: bool = True,
+                 freeze_embeddings: bool = True) -> None:
         super(LSTMCRF, self).__init__()
 
         assert vocab.n_chars == char_feats_layer.n_chars
         assert vocab.n_labels == crf.num_tags
+        assert vocab.n_words == word_vecs.size()[0]
 
         self.vocab = vocab
         self.dropout = nn.Dropout(p=dropout) if dropout else None
@@ -86,12 +98,17 @@ class LSTMCRF(nn.Module):
         # Layer for generating character-level word features.
         self.char_feats_layer = char_feats_layer
 
+        # Word-embedding layer.
+        self.word_vec_dim = word_vecs.size()[1]
+        self.word_embedding = \
+            nn.Embedding.from_pretrained(word_vecs, freeze=freeze_embeddings)
+
         # Recurrent layer. Takes as input the concatenation of the
         # char_feats_layer final hidden state and pre-trained embedding for
         # each word. The dimension of the output is given by
         # self.rnn_output_size (see below).
         self.rnn = nn.LSTM(
-            input_size=vocab.word_vec_dim + char_feats_layer.output_size,
+            input_size=self.word_vec_dim + char_feats_layer.output_size,
             hidden_size=hidden_dim,
             num_layers=layers,
             bidirectional=bidirectional,
@@ -115,7 +132,7 @@ class LSTMCRF(nn.Module):
                words: torch.Tensor,
                word_lengths: torch.Tensor,
                word_indices: torch.Tensor,
-               word_embs: torch.Tensor) -> torch.Tensor:
+               word_idxs: torch.Tensor) -> torch.Tensor:
         """
         Generate features for the CRF from input.
 
@@ -138,9 +155,8 @@ class LSTMCRF(nn.Module):
             Contains sorted indices of words by length, with shape
             ``[sent_length]``.
 
-        word_embs : torch.Tensor
-            Pretrained word embeddings with shape
-            ``[sent_length x word_emb_dim]``.
+        word_idxs : torch.Tensor
+            Word indices with shape ``[sent_length]``.
 
         Returns
         -------
@@ -153,15 +169,19 @@ class LSTMCRF(nn.Module):
         char_feats = self.char_feats_layer(words, word_lengths, word_indices)
         # char_feats: ``[sent_length x char_feats_layer.output_size]``
 
+        # Embed words into vector space.
+        word_embs = self.word_embedding(word_idxs)
+        # word_embs: ``[sent_length x self.word_vec_dim]``
+
         # Concatenate the character-level word features and word embeddings.
         word_feats = torch.cat([char_feats, word_embs], dim=-1)
         # word_feats: ``[sent_length x
-        #                (char_feats_layer.output_size + vocab.word_vec_dim)]``
+        #                (char_feats_layer.output_size + self.word_vec_dim)]``
 
         # Add a fake batch dimension.
         word_feats = word_feats.unsqueeze(0)
         # word_feats: ``[1 x sent_length x
-        #                (char_feats_layer.output_size + vocab.word_vec_dim)]``
+        #                (char_feats_layer.output_size + self.word_vec_dim)]``
 
         # Apply dropout.
         if self.dropout:
@@ -186,7 +206,7 @@ class LSTMCRF(nn.Module):
                 words: torch.Tensor,
                 word_lengths: torch.Tensor,
                 word_indices: torch.Tensor,
-                word_embs: torch.Tensor,
+                word_idxs: torch.Tensor,
                 lens: torch.Tensor = None) -> List[Tuple[List[int], float]]:
         # pylint: disable=not-callable
         """
@@ -205,9 +225,8 @@ class LSTMCRF(nn.Module):
             Contains sorted indices of words by length, with shape
             ``[sent_length]``.
 
-        word_embs : torch.Tensor
-            Pretrained word embeddings with shape
-            ``[sent_length x word_emb_dim]``.
+        word_idxs : torch.Tensor
+            Word indices with shape ``[sent_length]``.
 
         lens : torch.Tensor, optional (default: None)
             Gives the length of each sentence in the batch ``[batch_size]``.
@@ -223,7 +242,7 @@ class LSTMCRF(nn.Module):
         mask = sequence_mask(lens)
 
         # Gather word feats.
-        feats = self._feats(words, word_lengths, word_indices, word_embs)
+        feats = self._feats(words, word_lengths, word_indices, word_idxs)
         # feats: ``[1 x sent_length x n_labels]``
 
         # Run features through Viterbi decode algorithm.
@@ -235,7 +254,7 @@ class LSTMCRF(nn.Module):
                 words: torch.Tensor,
                 word_lengths: torch.Tensor,
                 word_indices: torch.Tensor,
-                word_embs: torch.Tensor,
+                word_idxs: torch.Tensor,
                 labs: torch.Tensor,
                 lens: torch.Tensor = None) -> torch.Tensor:
         # pylint: disable=arguments-differ,not-callable
@@ -255,9 +274,8 @@ class LSTMCRF(nn.Module):
             Contains sorted indices of words by length, with shape
             ``[sent_length]``.
 
-        word_embs : torch.Tensor
-            Pretrained word embeddings with shape
-            ``[sent_length x word_emb_dim]``.
+        word_idxs : torch.Tensor
+            Word indices with shape ``[sent_length]``.
 
         labs : torch.Tensor
             Corresponding target label sequence with shape ``[sent_length]``.
@@ -280,7 +298,7 @@ class LSTMCRF(nn.Module):
         # labs: ``[1 x sent_length]``
 
         # Gather word feats.
-        feats = self._feats(words, word_lengths, word_indices, word_embs)
+        feats = self._feats(words, word_lengths, word_indices, word_idxs)
         # feats: ``[1 x sent_length x n_labels]``
 
         loglik = self.crf(feats, labs, mask=mask)
@@ -298,13 +316,28 @@ class LSTMCRF(nn.Module):
             help="""Dimension of the hidden layer for the word-level
             features LSTM. Default is 50."""
         )
+        group.add_argument(
+            "--update-word-embeddings",
+            action="store_true",
+            help="""Allow word embeddings to update throughout the training
+            process."""
+        )
+        group.add_argument(
+            "--word-vec-dim",
+            type=int,
+            default=100,
+            help="""Dimension of word vector embedding. Default is 100."""
+        )
 
     @classmethod
     def cl_init(cls,
-                opts: argparse.Namespace, vocab: Vocab,
-                char_feats_layer: torch.nn.Module):
+                opts: argparse.Namespace,
+                vocab: Vocab,
+                char_feats_layer: torch.nn.Module,
+                word_vecs: torch.Tensor):
         """Initialize an instance of this model from command-line options."""
         crf = ConditionalRandomField(vocab.n_labels)
-        return cls(vocab, char_feats_layer, crf,
+        return cls(vocab, char_feats_layer, crf, word_vecs,
                    hidden_dim=opts.hidden_dim,
-                   dropout=opts.dropout)
+                   dropout=opts.dropout,
+                   freeze_embeddings=not opts.update_word_embeddings)
