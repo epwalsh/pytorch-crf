@@ -35,11 +35,14 @@ class Logger:
                  log_interval: int = 100,
                  verbose: bool = True,
                  log_dir: str = None,
-                 results_file: str = None) -> None:
+                 results_file: str = None,
+                 log_weights: bool = False) -> None:
         self.n_examples = n_examples
         self.log_interval = log_interval
         self.verbose = verbose
         self.results_file = results_file
+        self.log_weights = log_weights
+
         self.eval_stats: List[ModelStats] = []
 
         self.train_start_time: float = time.time()
@@ -177,13 +180,15 @@ class Logger:
             duration = time.time() - self.running_time
             print("[{:6.2f}%] loss: {:10.5f}, duration: {:.2f} seconds"
                   .format(progress, self.running_loss, duration), flush=True)
-            self.running_loss = 0.
-            self.running_time = time.time()
 
             if self.writer is not None:
                 step = self.current_epoch * self.n_examples + iteration + 1
-                for tag, value in params:
-                    if not value.requires_grad:
-                        continue
-                    tag = tag.replace(".", "/")
-                    self.histo_summary(tag, value.data.cpu().numpy(), step)
+                if self.log_weights:
+                    for tag, value in params:
+                        if not value.requires_grad:
+                            continue
+                        tag = tag.replace(".", "/")
+                        self.histo_summary(tag, value.data.cpu().numpy(), step)
+
+            self.running_loss = 0.
+            self.running_time = time.time()

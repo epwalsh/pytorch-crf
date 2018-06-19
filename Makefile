@@ -1,5 +1,5 @@
 test = ./test/
-logdir = ./training/logs
+logdir = s3://structurely-ml-logs/pycrf/
 port = 6006
 
 PYTHON_VERSION := `grep "python:" Dockerfile | head -1 | sed -r 's/.*([0-9]\.[0-9]).*/\1/g'`
@@ -43,8 +43,8 @@ create-branch :
 .PHONY : tensor-board
 tensor-board :
 	@google-chrome http://localhost:$(port)
-	tensorboard --logdir=$(logdir) --port=$(port)
+	S3_REGION=us-west-2 tensorboard --logdir=$(logdir) --port=$(port)
 
 .PHONY : clean
 clean :
-	@rm -f ./training/logs/*
+	@find ./training/logs -type f | grep -E "tfevents" | xargs rm -f
