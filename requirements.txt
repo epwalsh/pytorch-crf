@@ -1,4 +1,4 @@
-torchtext
+torch>=0.4.0
 numpy
 tensorflow
 tensorboard

@@ -43,7 +43,9 @@ create-branch :
 .PHONY : tensor-board
 tensor-board :
 	@google-chrome http://localhost:$(port)
-	S3_REGION=us-west-2 tensorboard --logdir=$(logdir) --port=$(port)
+	S3_REGION=us-west-2 TF_CPP_MIN_LOG_LEVEL=2 tensorboard \
+		--logdir=$(logdir) \
+		--port=$(port)
 
 .PHONY : clean
 clean :

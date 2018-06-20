@@ -1,23 +1,28 @@
 """Defines test fixtures."""
 
 import pytest
-import torchtext
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
 from pycrf.eval import ModelStats
 from pycrf.io.dataset import Dataset
 from pycrf.io.vocab import Vocab
+from pycrf.io.vectors import load_pretrained
 from pycrf.modules import CharLSTM, LSTMCRF, CharCNN
 
 
 @pytest.fixture(scope="session")
 def glove():
-    return torchtext.vocab.GloVe(name="6B", dim=100, cache="test/.vector_cache")
+    vectors, itos, stoi = load_pretrained("test/.vector_cache/glove.6B.100d.txt")
+    return {
+        "vectors": vectors,
+        "terms_itos": itos,
+        "terms_stoi": stoi,
+    }
 
 
 @pytest.fixture(scope="session")
 def vocab_dataset(glove):
-    vocab = Vocab(glove.stoi, glove.itos)
+    vocab = Vocab(glove["terms_stoi"], glove["terms_itos"])
     dataset = Dataset()
     dataset.load_file("test/data/sample_dataset.txt", vocab)
     return vocab, dataset
@@ -40,7 +45,7 @@ def char_cnn(vocab_dataset):
 
 @pytest.fixture(scope="session")
 def lstm_crf(vocab_dataset, char_lstm, crf, glove):
-    return LSTMCRF(vocab_dataset[0], char_lstm, crf, glove.vectors, hidden_dim=50)
+    return LSTMCRF(vocab_dataset[0], char_lstm, crf, glove["vectors"], hidden_dim=50)
 
 
 @pytest.fixture(scope="session")

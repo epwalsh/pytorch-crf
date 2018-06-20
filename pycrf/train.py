@@ -19,15 +19,14 @@ import argparse
 from typing import List
 
 import torch
-import torchtext
 
 from .eval import ModelStats
 from .io import Vocab, Dataset
+from .io.vectors import load_pretrained
 from .logging import Logger
 from .modules import LSTMCRF
 from .optim import OPTIM_ALIASES
 from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
-
 
 
 def save_checkpoint(model: torch.nn.Module,
@@ -232,8 +231,9 @@ def main(args: List[str] = None) -> None:
         device = torch.device("cpu")
 
     # Load pretrained word embeddings and initialize vocab.
-    glove = torchtext.vocab.GloVe(name="6B", dim=opts.word_vec_dim, cache=opts.vectors)
-    vocab = Vocab(glove.stoi, glove.itos)
+    print(f"Loading pretrained word vectors from {opts.word_vectors}", flush=True)
+    pretrained_vecs, terms_itos, terms_stoi = load_pretrained(opts.word_vectors)
+    vocab = Vocab(terms_stoi, terms_itos)
 
     # Load datasets.
     print("Loading datasets", flush=True)
@@ -252,7 +252,7 @@ def main(args: List[str] = None) -> None:
 
     # Initialize the model.
     char_feats_layer = char_feats_class.cl_init(opts, vocab).to(device)
-    model = LSTMCRF.cl_init(opts, vocab, char_feats_layer, glove.vectors).to(device)
+    model = LSTMCRF.cl_init(opts, vocab, char_feats_layer, pretrained_vecs).to(device)
     print(model, flush=True)
 
     # Initialize the optimizer.

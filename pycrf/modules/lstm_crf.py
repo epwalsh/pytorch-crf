@@ -27,7 +27,7 @@ class LSTMCRF(nn.Module):
     crf : allennlp.modules.conditional_random_field.ConditionalRandomField
         The CRF model.
 
-    word_vecs : torch.Tensor
+    pretrained_word_vecs : torch.Tensor
         Pre-trained word vectors with shape ``[vocab_size x embedding_dimension]``.
 
     hidden_dim : int, optional (default: 100)
@@ -80,7 +80,7 @@ class LSTMCRF(nn.Module):
                  vocab: Vocab,
                  char_feats_layer: torch.nn.Module,
                  crf: ConditionalRandomField,
-                 word_vecs: torch.Tensor,
+                 pretrained_word_vecs: torch.Tensor,
                  hidden_dim: int = 100,
                  layers: int = 1,
                  dropout: float = 0.,
@@ -90,7 +90,7 @@ class LSTMCRF(nn.Module):
 
         assert vocab.n_chars == char_feats_layer.n_chars
         assert vocab.n_labels == crf.num_tags
-        assert vocab.n_words == word_vecs.size()[0]
+        assert vocab.n_words == pretrained_word_vecs.size()[0]
 
         self.vocab = vocab
         self.dropout = nn.Dropout(p=dropout) if dropout else None
@@ -99,9 +99,9 @@ class LSTMCRF(nn.Module):
         self.char_feats_layer = char_feats_layer
 
         # Word-embedding layer.
-        self.word_vec_dim = word_vecs.size()[1]
+        self.word_vec_dim = pretrained_word_vecs.size()[1]
         self.word_embedding = \
-            nn.Embedding.from_pretrained(word_vecs, freeze=freeze_embeddings)
+            nn.Embedding.from_pretrained(pretrained_word_vecs, freeze=freeze_embeddings)
 
         # Recurrent layer. Takes as input the concatenation of the
         # char_feats_layer final hidden state and pre-trained embedding for
@@ -319,14 +319,8 @@ class LSTMCRF(nn.Module):
         group.add_argument(
             "--update-word-embeddings",
             action="store_true",
-            help="""Allow word embeddings to update throughout the training
-            process."""
-        )
-        group.add_argument(
-            "--word-vec-dim",
-            type=int,
-            default=100,
-            help="""Dimension of word vector embedding. Default is 100."""
+            help="""Allow pretrained word embeddings to update throughout the
+            training process."""
         )
 
     @classmethod

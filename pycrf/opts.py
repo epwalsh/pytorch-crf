@@ -82,9 +82,10 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         help="""Path to the file where the trained model should be saved."""
     )
     group.add_argument(
-        "--vectors",
+        "--word-vectors",
         type=str,
-        help="""Path to vector cache."""
+        required=True,
+        help="""Path to pretrained word vectors."""
     )
     group.add_argument(
         "--epochs",
