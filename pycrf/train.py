@@ -7,11 +7,12 @@ The training script itself is invoked with:
 
   python -m pycrf.train
 
-You can see all of the options available for training a specific model with:
+You can see all of the options available for a specific character-level
+feature model or optimizer with:
 
 .. code-block:: bash
 
-  python -m pycrf.train --help --model MODEL_NAME
+  python -m pycrf.train --help --char-features MODEL_NAME --optim OPTIM_NAME
 
 """
 
@@ -29,18 +30,42 @@ from .optim import OPTIM_ALIASES
 from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
 
 
+def _get_checkpoint_path(path: str, epoch: int) -> str:
+    return f"{path}_epoch_{epoch+1:03d}.pt"
+
+
 def save_checkpoint(model: torch.nn.Module,
                     optimizer: torch.optim.Optimizer,
                     path: str,
                     epoch: int) -> None:
     """Save a training checkpoint."""
-    new_path = f"{path}_epoch_{epoch+1:03d}.pt"
-    print(f"Saving checkpoint to {new_path}")
+    checkpoint_path = _get_checkpoint_path(path, epoch)
+    print(f"Saving checkpoint to {checkpoint_path}")
     torch.save({
         "epoch": epoch + 1,
         "state_dict": model.state_dict(),
         "optimizer": optimizer.state_dict(),
-    }, new_path)
+    }, checkpoint_path)
+
+
+def load_checkpoint(model: torch.nn.Module,
+                    path: str,
+                    epoch: int,
+                    optimizer: torch.optim.Optimizer = None) -> None:
+    """Load model weights from checkpoint."""
+    checkpoint_path = _get_checkpoint_path(path, epoch)
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint["state_dict"])
+    if optimizer is not None:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+
+
+def save_model(model: torch.nn.Module, path: str, epoch: int) -> None:
+    """Save the model with best epoch weights."""
+    model_path = f"{path}.pt"
+    print(f"Saving best model to {model_path}")
+    load_checkpoint(model, path, epoch)
+    torch.save(model, model_path)
 
 
 def train(opts: argparse.Namespace,
@@ -176,7 +201,11 @@ def train(opts: argparse.Namespace,
     # ==========================================================================
 
     # Log results.
-    logger.end_train(validation=bool(dataset_valid))
+    best_epoch = logger.end_train(validation=bool(dataset_valid))
+
+    # Save best model.
+    if opts.out:
+        save_model(model, opts.out, best_epoch)
 
 
 def main(args: List[str] = None) -> None:
@@ -207,12 +236,12 @@ def main(args: List[str] = None) -> None:
 
     # Add optimizer-specific options.
     optim_class = OPTIM_ALIASES[initial_opts.optim]
-    optim_class.cl_opts(parser)
+    optim_class.cl_opts(parser, require=not initial_opts.help)
 
     # Add model-specific options.
-    LSTMCRF.cl_opts(parser)
+    LSTMCRF.cl_opts(parser, require=not initial_opts.help)
     char_feats_class = MODEL_ALIASES[initial_opts.char_features]
-    char_feats_class.cl_opts(parser)
+    char_feats_class.cl_opts(parser, require=not initial_opts.help)
 
     # Check if we should display the help message and exit.
     if initial_opts.help:

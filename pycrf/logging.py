@@ -1,6 +1,7 @@
 """Train logging."""
 
 import time
+import datetime
 from typing import List
 
 import numpy as np
@@ -8,6 +9,10 @@ import torch
 import tensorflow as tf
 
 from .eval import ModelStats
+
+
+def _format_duration(seconds):
+    return str(datetime.timedelta(seconds=int(seconds)))
 
 
 class Logger:
@@ -48,6 +53,8 @@ class Logger:
         self.train_start_time: float = time.time()
         self.epoch_start_time: float = None
         self.running_time: float = None
+        self.epoch_duration: float = None
+        self.time_to_epoch: float = None
 
         self.epoch_loss = 0.
         self.running_loss = 0.
@@ -112,15 +119,14 @@ class Logger:
 
     def end_epoch(self) -> None:
         """Log end of epoch."""
-        epoch_duration = time.time() - self.epoch_start_time
-        print("Loss: {:f}, duration: {:.0f} seconds"
-              .format(self.epoch_loss, epoch_duration), flush=True)
+        now = time.time()
+        self.epoch_duration = now - self.epoch_start_time
+        self.time_to_epoch = now - self.train_start_time
+        print(f"Loss: {self.epoch_loss:f}, duration: {self.epoch_duration:.0f} seconds", flush=True)
+        print(f"Total time: {_format_duration(self.time_to_epoch):s}")
 
-    def end_train(self, validation: bool = False) -> None:
+    def end_train(self, validation: bool = False) -> int:
         """End round of training."""
-        train_duration = time.time() - self.train_start_time
-        print(f"Total training time: {train_duration:.0f} seconds\n", flush=True)
-
         if validation:
             best_epoch = max(self.eval_stats, key=lambda x: x.score)
         else:
@@ -129,7 +135,7 @@ class Logger:
         f1_score, precision, recall, accuracy = best_epoch.score
         loss = best_epoch.loss
 
-        print(f"Best epoch: {best_epoch.epoch+1:d}\n------------------", flush=True)
+        print(f"\nBest epoch: {best_epoch.epoch+1:d}\n------------------", flush=True)
         if validation:
             print(f"f1:         {f1_score:.4f}\n"
                   f"precision:  {precision:.4f}\n"
@@ -145,7 +151,10 @@ class Logger:
                     resultsfile.write(f"  micro_avg_f1: {f1_score:f}\n")
                     resultsfile.write(f"  micro_avg_precision: {precision:f}\n")
                     resultsfile.write(f"  micro_avg_recall: {recall:f}\n")
+                    resultsfile.write(f"  total_time: {self.time_to_epoch:f}\n")
                 resultsfile.write(f"  loss: {best_epoch.loss:f}\n")
+
+        return best_epoch.epoch
 
     def append_eval_stats(self,
                           eval_stats: ModelStats,
@@ -160,6 +169,7 @@ class Logger:
             info["validation/recall"] = score[2]
             info["validation/accuracy"] = score[3]
         eval_stats.loss = self.epoch_loss
+        eval_stats.time_to_epoch = self.time_to_epoch
         self.eval_stats.append(eval_stats)
         if self.writer is not None:
             for tag, value in info.items():

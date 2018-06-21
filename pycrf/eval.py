@@ -158,6 +158,7 @@ class ModelStats:
         self.overlap_count = 0
         self.loss = loss
         self.epoch = epoch
+        self.time_to_epoch: float = None
         self._scheme = \
             _detect_label_scheme([lab for _, lab in labels_itos.items()])
         self.span_getter = iob_to_spans \
@@ -184,11 +185,11 @@ class ModelStats:
     def __str__(self) -> str:
         f1, precision, recall, accuracy = self.score
         return \
-            "Micro average scores by entity:\n"\
-            f"precision: {precision:.4f}\n"\
-            f"recall:    {recall:.4f}\n"\
-            f"f1:        {f1:.4f}\n"\
-            f"Accuracy by token: {accuracy:.4f}\n"
+            "Validation set scores:\n"\
+            f"precision:      {precision:.4f}\n"\
+            f"recall:         {recall:.4f}\n"\
+            f"f1:             {f1:.4f}\n"\
+            f"token accuracy: {accuracy:.4f}\n"
 
     def reset(self) -> None:
         """Reset metrics."""

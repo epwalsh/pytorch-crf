@@ -12,7 +12,7 @@ class CLOptim(ABC):
 
     @staticmethod
     @abstractstaticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to this optimizer."""
         pass
 
@@ -31,7 +31,7 @@ class AdaGrad(torch.optim.Adagrad, CLOptim):
     """Wraps torch AdaGrad optimizer."""
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to this optimizer."""
         group = parser.add_argument_group("AdaGrad options")
         group.add_argument(
@@ -66,7 +66,7 @@ class AdaDelta(torch.optim.Adadelta, CLOptim):
     """Wraps torch AdaDelta optimizer."""
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to this optimizer."""
         group = parser.add_argument_group("AdaDelta options")
         group.add_argument(
@@ -110,7 +110,7 @@ class RMSProp(torch.optim.RMSprop, CLOptim):
     """Wraps torch RMSProp optimizer."""
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to this optimizer."""
         group = parser.add_argument_group("RMSProp options")
         group.add_argument(
@@ -167,7 +167,7 @@ class Adam(torch.optim.Adam, CLOptim):
     """Wraps torch Adam optimizer."""
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to Adam."""
         group = parser.add_argument_group("Adam options")
         group.add_argument(
@@ -224,7 +224,7 @@ class SparseAdam(torch.optim.SparseAdam, CLOptim):
     """Wraps torch SparseAdam optimizer."""
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to Adam."""
         group = parser.add_argument_group("SparseAdam options")
         group.add_argument(
@@ -282,7 +282,7 @@ class SGD(torch.optim.SGD, CLOptim):
         self.last_loss: float = None
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to SGD."""
         group = parser.add_argument_group("SGD options")
         group.add_argument(

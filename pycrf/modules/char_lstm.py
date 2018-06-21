@@ -146,7 +146,8 @@ class CharLSTM(nn.Module):
         return hidden
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
+        # pylint: disable=unused-argument
         """Define command-line options specific to this model."""
         group = parser.add_argument_group("Character LSTM options")
         group.add_argument(

@@ -133,7 +133,8 @@ class CharCNN(nn.Module):
         return output
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
+        # pylint: disable=unused-argument
         """Define command-line options specific to this model."""
         group = parser.add_argument_group("Character CNN options")
         group.add_argument(

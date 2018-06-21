@@ -306,7 +306,7 @@ class LSTMCRF(nn.Module):
         return -1. * loglik
 
     @staticmethod
-    def cl_opts(parser: argparse.ArgumentParser) -> None:
+    def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Define command-line options specific to this model."""
         group = parser.add_argument_group("Bi-LSTM CRF options")
         group.add_argument(
@@ -321,6 +321,12 @@ class LSTMCRF(nn.Module):
             action="store_true",
             help="""Allow pretrained word embeddings to update throughout the
             training process."""
+        )
+        group.add_argument(
+            "--word-vectors",
+            type=str,
+            required=require,
+            help="""Path to pretrained word vectors."""
         )
 
     @classmethod
