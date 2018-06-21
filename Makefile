@@ -1,7 +1,8 @@
 test = ./test/
-logdir = s3://structurely-ml-logs/pycrf/
-port = 6006
+logdir = ./training/logs/
 
+S3_LOGDIR       = s3://structurely-ml-logs/pycrf/
+TB_PORT         = 6006
 PYTHON_VERSION := `grep "python:" Dockerfile | head -1 | sed -r 's/.*([0-9]\.[0-9]).*/\1/g'`
 IMAGE_TAG      := python$(PYTHON_VERSION)
 
@@ -10,10 +11,12 @@ IMAGE_TAG      := python$(PYTHON_VERSION)
 help :
 	@echo \
 		"Commands:\n"\
-		"  lint:      runs pylint and pydocstyle on source files.\n"\
-		"  typecheck: runs mypy to statically check types.\n"\
-		"  unit-test: runs pytest on the test/ directory.\n"\
-		"  test:      runs all of the above."
+		"  lint:        run pylint and pydocstyle on source files.\n"\
+		"  typecheck:   run mypy to statically check types.\n"\
+		"  unit-test:   run pytest on the test/ directory.\n"\
+		"  test:        run all of the above.\n"\
+		"  pull-logs:   pull training logs from S3.\n"\
+		"  tensorboard: start a tensorboard instance to examine logs."
 
 .PHONY : typecheck
 typecheck :
@@ -40,12 +43,21 @@ create-branch :
 	git checkout -b ISSUE-$(num)
 	git push --set-upstream origin ISSUE-$(num)
 
-.PHONY : tensor-board
-tensor-board :
-	@google-chrome http://localhost:$(port)
-	S3_REGION=us-west-2 TF_CPP_MIN_LOG_LEVEL=2 tensorboard \
+.PHONY : pull-logs
+pull-logs :
+	@mkdir -p ./training/logs
+	@aws s3 cp --recursive $(S3_LOGDIR) ./training/logs/
+
+.PHONY : tensorboard
+tensorboard :
+	@if [ -x "$$(command -v google-chrome)" ]; then \
+		google-chrome http://localhost:$(TB_PORT); \
+	else \
+		open http://localhost:$(TB_PORT); \
+	fi
+	@S3_REGION=us-west-2 TF_CPP_MIN_LOG_LEVEL=2 tensorboard \
 		--logdir=$(logdir) \
-		--port=$(port)
+		--port=$(TB_PORT)
 
 .PHONY : clean
 clean :
