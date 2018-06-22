@@ -51,23 +51,6 @@ def base_opts(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def label_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
-    """Add options specific to the labelling task."""
-    group = parser.add_argument_group("Labelling options")
-    group.add_argument(
-        "--model",
-        type=str,
-        required=require,
-        help="""Path to the model file."""
-    )
-    group.add_argument(
-        "--data",
-        type=str,
-        required=require,
-        help="""Path to the dataset."""
-    )
-
-
 def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
     """Add options specific to a training task."""
     group = parser.add_argument_group("Training options")
@@ -149,42 +132,3 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         type=str,
         help="""A checkpoint file to start training from."""
     )
-
-
-def get_parser(args, options):
-    """Get parser and initial options."""
-    parser = argparse.ArgumentParser(add_help=False)
-    help_opts(parser)
-
-    # Parse initial option to check for 'help' flag.
-    initial_opts, _ = parser.parse_known_args(args=args)
-
-    # Add base options and parse again.
-    base_opts(parser)
-    options(parser, require=not initial_opts.help)
-    initial_opts, _ = parser.parse_known_args(args=args)
-
-    return initial_opts, parser
-
-
-def parse_all(args, initial_opts, parser):
-    """Parse all command line arguments."""
-    # Check if we should display the help message and exit.
-    if initial_opts.help:
-        parser.print_help()
-        return None
-
-    # Parse the args again.
-    opts = parser.parse_args(args=args)
-    return opts
-
-
-def get_device(opts):
-    """Get device to put model and tensors on."""
-    if opts.cuda:
-        device = torch.device("cuda", opts.gpu_id)
-    else:
-        if torch.cuda.is_available():
-            print("Warning: CUDA is available, but you have not used the --cuda flag")
-        device = torch.device("cpu")
-    return device

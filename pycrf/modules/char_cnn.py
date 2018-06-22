@@ -4,11 +4,10 @@ import argparse
 
 import torch
 import torch.nn as nn
-from torch.nn import Conv1d
+from torch.nn import Dropout, Conv1d, Embedding
 
 from pycrf.io import Vocab
 from pycrf.nn.utils import unsort
-from .char_embedding import CharEmbedding
 
 
 class CharCNN(nn.Module):
@@ -43,8 +42,11 @@ class CharCNN(nn.Module):
     n_chars : int
         The number of characters in the vocabularly, i.e. the input size.
 
-    char_embedding : torch.nn.Embedding
+    embedding : torch.nn.Embedding
         The character embedding layer.
+
+    dropout : torch.nn.Dropout
+        A dropout applied to the embedding features.
 
     cnn : torch.nn.Conv1d
         The convolution layer.
@@ -67,9 +69,12 @@ class CharCNN(nn.Module):
         self.n_chars = n_chars
 
         # Character embedding layer.
-        self.char_embedding = CharEmbedding(n_chars, embedding_size,
-                                            dropout=dropout,
-                                            padding_idx=padding_idx)
+        self.embedding = \
+            Embedding(self.n_chars, embedding_size, padding_idx=padding_idx)
+
+        # Dropout applied to embeddings.
+        self.embedding_dropout = \
+            Dropout(p=dropout) if dropout else None
 
         # Convolutional layer.
         self.cnn = \
@@ -105,8 +110,12 @@ class CharCNN(nn.Module):
 
         """
         # Pass inputs through embedding layer.
-        inputs_emb = self.char_embedding(inputs).permute(0, 2, 1)
+        inputs_emb = self.embedding(inputs).permute(0, 2, 1)
         # inputs_emb: ``[sent_length x embedding_size x max_word_length ]``
+
+        # Apply dropout to embeddings.
+        if self.embedding_dropout:
+            inputs_emb = self.embedding_dropout(inputs_emb)
 
         # Run embeddings through convolution layer.
         output = self.cnn(inputs_emb)
@@ -128,7 +137,6 @@ class CharCNN(nn.Module):
         # pylint: disable=unused-argument
         """Define command-line options specific to this model."""
         group = parser.add_argument_group("Character CNN options")
-        CharEmbedding.cl_opts(group)
         group.add_argument(
             "--cnn-channels",
             type=int,
@@ -146,6 +154,13 @@ class CharCNN(nn.Module):
             type=int,
             default=3,
             help="""Kernel size of the convolutions. Default is 3."""
+        )
+        group.add_argument(
+            "--char-embedding-size",
+            type=int,
+            default=50,
+            help="""The dimension of the character embedding layer.
+            Default is 50."""
         )
 
     @classmethod
