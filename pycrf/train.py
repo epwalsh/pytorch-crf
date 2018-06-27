@@ -28,6 +28,7 @@ from .logging import Logger
 from .modules import LSTMCRF
 from .optim import OPTIM_ALIASES
 from .opts import train_opts, MODEL_ALIASES, get_parser, parse_all, get_device
+from .utils import _parse_data_path
 
 
 def _get_checkpoint_path(path: str, epoch: int) -> str:
@@ -250,22 +251,28 @@ def main(args: List[str] = None) -> None:
     # Load pretrained word embeddings and initialize vocab.
     print(f"Loading pretrained word vectors from {opts.word_vectors}", flush=True)
     pretrained_vecs, terms_itos, terms_stoi = load_pretrained(opts.word_vectors)
-    vocab = Vocab(terms_stoi, terms_itos)
+    vocab = Vocab(terms_stoi, terms_itos, default_context=opts.default_context)
 
     # Load datasets.
     print("Loading datasets", flush=True)
     dataset_train = Dataset()
-    dataset_valid = Dataset()
+    dataset_valid = Dataset(is_test=True)
     for fname in opts.train:
-        dataset_train.load_file(fname, vocab, device=device)
-    print("Loaded {:d} sentences for training".format(len(dataset_train)),
-          flush=True)
+        context, path = _parse_data_path(fname)
+        dataset_train.load_file(path, vocab, device=device, sent_context=context)
+
+    print(f"Loaded {len(dataset_train):d} sentences for training", flush=True)
+
     if opts.validation:
         for fname in opts.validation:
-            dataset_valid.load_file(fname, vocab, device=device)
-        print("Loaded {:d} sentences for validation"
-              .format(len(dataset_valid)))
-    print("Training on labels:", list(vocab.labels_stoi.keys()))
+            context, path = _parse_data_path(fname)
+            dataset_valid.load_file(path, vocab, device=device, sent_context=context)
+
+        print(f"Loaded {len(dataset_valid):d} sentences for validation", flush=True)
+
+    print("Found the following labels:", list(vocab.labels_stoi.keys()))
+    if len(vocab.sent_context_stoi) > 1:
+        print("Found the following sentence contexts:", list(vocab.sent_context_stoi))
 
     # Initialize the model.
     char_feats_layer = char_feats_class.cl_init(opts, vocab).to(device)
@@ -273,8 +280,7 @@ def main(args: List[str] = None) -> None:
     print(model, flush=True)
 
     # Initialize the optimizer.
-    optimizer = optim_class.cl_init(
-        filter(lambda p: p.requires_grad, model.parameters()), opts)
+    optimizer = optim_class.cl_init(filter(lambda p: p.requires_grad, model.parameters()), opts)
 
     # Train model.
     train(opts, model, optimizer, dataset_train, dataset_valid)

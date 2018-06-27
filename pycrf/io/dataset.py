@@ -16,9 +16,10 @@ GeneratorType2 = Generator[Tuple[SourceType, TargetType, List[str], List[str]], 
 class Dataset(Sized, Iterable):
     """Class for abstracting training and testing datasets."""
 
-    def __init__(self) -> None:
+    def __init__(self, is_test: bool = False) -> None:
         self.source: List[SourceType] = []
         self.target: List[TargetType] = []
+        self.is_test = is_test
 
     def __getitem__(self, key: int) -> Tuple[SourceType, TargetType]:
         return self.source[key], self.target[key]
@@ -47,7 +48,9 @@ class Dataset(Sized, Iterable):
     @staticmethod
     def read_file(fname: str,
                   vocab: Vocab,
-                  device: torch.device = None) -> GeneratorType2:
+                  device: torch.device = None,
+                  sent_context: str = None,
+                  test: bool = True) -> GeneratorType2:
         """
         Read sentences from a file.
 
@@ -76,6 +79,12 @@ class Dataset(Sized, Iterable):
         device : torch.device, optional
             The device to send the tensors to.
 
+        sent_context : str, optional
+            The sentence-level context.
+
+        test : bool, optional
+            Whether this represents a new test sentence.
+
         Yields
         ------
         Tuple[SourceType, TargetType, List[str], List[str]]
@@ -87,8 +96,11 @@ class Dataset(Sized, Iterable):
             for line in datafile.readlines():
                 line_list = line.rstrip().split('\t')
                 if len(line_list) == 1:  # end of sentence.
-                    target_tensor = vocab.labs2tensor(tgt, device=device)
-                    source_tensor = vocab.sent2tensor(src, device=device)
+                    target_tensor = vocab.labs2tensor(tgt, device=device,
+                                                      test=test)
+                    source_tensor = vocab.sent2tensor(src, device=device,
+                                                      sent_context=sent_context,
+                                                      test=test)
                     yield source_tensor, target_tensor, src, tgt
                     src = []
                     tgt = []
@@ -100,7 +112,8 @@ class Dataset(Sized, Iterable):
                   fname: str,
                   vocab: Vocab,
                   limit: int = None,
-                  device: torch.device = None) -> None:
+                  device: torch.device = None,
+                  sent_context: str = None) -> None:
         """
         Load sentences from a file.
 
@@ -132,6 +145,9 @@ class Dataset(Sized, Iterable):
         device : torch.device, optional
             The device to send the tensors to.
 
+        sent_context : str, optional
+            The sentence-level context.
+
         Returns
         -------
         None
@@ -139,7 +155,10 @@ class Dataset(Sized, Iterable):
         """
         print("Loading file {:s}".format(fname), flush=True)
         i = 0
-        for source, target, _, _ in self.read_file(fname, vocab, device=device):
+        cursor = self.read_file(fname, vocab, device=device,
+                                sent_context=sent_context,
+                                test=self.is_test)
+        for source, target, _, _ in cursor:
             self.source.append(source)
             self.target.append(target)
             i += 1

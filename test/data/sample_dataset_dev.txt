@@ -1,0 +1,14 @@
+what	O
+is	O
+your	O
+name	O
+
+it	O
+'s	O
+Nate	B-NAME
+
+how	O
+are	B-FOO
+you	O
+?	O
+

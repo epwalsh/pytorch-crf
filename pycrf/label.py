@@ -1,6 +1,7 @@
 """Label a test dataset from the command line."""
 
 import argparse
+from itertools import chain
 from typing import List
 
 import torch
@@ -8,6 +9,7 @@ import torch
 from .eval import ModelStats
 from .io import Dataset
 from .opts import label_opts, get_parser, parse_all, get_device
+from .utils import _parse_data_path
 
 
 def label_data(opts: argparse.Namespace,
@@ -33,7 +35,14 @@ def label_data(opts: argparse.Namespace,
 
     eval_stats = ModelStats(model.vocab.labels_itos)
     try:
-        cursor = Dataset.read_file(opts.data, model.vocab, device=device)
+        cursors = []
+        for fname in opts.data:
+            context, path = _parse_data_path(fname)
+            cursor = Dataset.read_file(path, model.vocab, device=device,
+                                       test=True,
+                                       sent_context=context)
+            cursors.append(cursor)
+        cursor = chain(*cursors)
         for src, tgt, raw_src, raw_tgt in cursor:
             labs = list(tgt.cpu().numpy())
             preds = model.predict(*src)[0][0]

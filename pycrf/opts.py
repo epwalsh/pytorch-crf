@@ -63,6 +63,7 @@ def label_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
     group.add_argument(
         "--data",
         type=str,
+        nargs="+",
         required=require,
         help="""Path to the dataset."""
     )
@@ -148,6 +149,11 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         "--checkpoint",
         type=str,
         help="""A checkpoint file to start training from."""
+    )
+    group.add_argument(
+        "--default-context",
+        type=str,
+        default="default",
     )
 
 

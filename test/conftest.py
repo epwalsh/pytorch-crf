@@ -29,6 +29,23 @@ def vocab_dataset(glove):
 
 
 @pytest.fixture(scope="session")
+def vocab(vocab_dataset):
+    return vocab_dataset[0]
+
+
+@pytest.fixture(scope="session")
+def dataset(vocab_dataset):
+    return vocab_dataset[1]
+
+
+@pytest.fixture(scope="session")
+def dataset_dev(vocab):
+    dataset = Dataset(is_test=True)
+    dataset.load_file("test/data/sample_dataset_dev.txt", vocab)
+    return data
+
+
+@pytest.fixture(scope="session")
 def crf(vocab_dataset):
     return ConditionalRandomField(vocab_dataset[0].n_labels)
 
