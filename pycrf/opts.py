@@ -70,6 +70,7 @@ def label_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
 
 
 def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
+    # pylint: disable=unused-argument
     """Add options specific to a training task."""
     group = parser.add_argument_group("Training options")
     group.add_argument(
@@ -80,9 +81,13 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         help="""The character-level feature generation layer to use."""
     )
     group.add_argument(
+        "--word-vectors",
+        type=str,
+        help="""Path to pretrained word vectors."""
+    )
+    group.add_argument(
         "--train",
         type=str,
-        required=require,
         nargs="+",
         help="""Path(s) to the training dataset(s)."""
     )
@@ -92,6 +97,17 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
         nargs="+",
         default=[],
         help="""Path(s) to the validation dataset(s)."""
+    )
+    group.add_argument(
+        "--train-object",
+        type=str,
+        help="""Binary object to train from. This should be a pickled dictionary
+        with the keys 'train', 'validation', 'vocab', and 'word_vectors'."""
+    )
+    group.add_argument(
+        "--vocab",
+        type=str,
+        help="""Path to a vocab object."""
     )
     group.add_argument(
         "-o", "--out",

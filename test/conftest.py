@@ -1,5 +1,10 @@
 """Defines test fixtures."""
 
+import os
+from urllib.request import urlopen
+import sys
+import zipfile
+
 import pytest
 
 from allennlp.modules.conditional_random_field import ConditionalRandomField
@@ -10,9 +15,47 @@ from pycrf.io.vectors import load_pretrained
 from pycrf.modules import CharLSTM, LSTMCRF, CharCNN
 
 
+VECTOR_CACHE = "test/.vector_cache/glove.6B.100d.txt"
+VECTOR_CACHE_ZIP = "test/.vector_cache/glove.6B.zip"
+VECTOR_CACHE_URL = "http://nlp.stanford.edu/data/glove.6B.zip"
+
+
+def extract_vecs(fname, dest):
+    zip_ref = zipfile.ZipFile(fname, 'r')
+    zip_ref.extractall(dest)
+    zip_ref.close()
+
+
+def download_vecs():
+    """Download pretrained GloVe word embeddings from Stanford."""
+    u = urlopen(VECTOR_CACHE_URL)
+    f = open(VECTOR_CACHE_ZIP, 'wb')
+    file_size = int(next((data for name, data in u.getheaders() if name == "Content-Length"), 0))
+    file_size_dl = 0
+    block_sz = 8192
+    while True:
+        buffer = u.read(block_sz)
+        if not buffer:
+            break
+    
+        file_size_dl += len(buffer)
+        f.write(buffer)
+        status = f"\r{file_size_dl:10d} {file_size_dl * 100 / file_size:3.2f}%"
+        sys.stdout.write(status)
+        sys.stdout.flush()
+    
+    f.close()
+
+    print("Extracting word vectors", flush=True)
+    extract_vecs(VECTOR_CACHE_ZIP, "test/.vector_cache")
+
+
 @pytest.fixture(scope="session")
 def glove():
-    vectors, itos, stoi = load_pretrained("test/.vector_cache/glove.6B.100d.txt")
+    if not os.path.isfile(VECTOR_CACHE):
+        os.mkdir("test/.vector_cache")
+        download_vecs()
+    vectors, itos, stoi = load_pretrained(VECTOR_CACHE)
     return {
         "vectors": vectors,
         "terms_itos": itos,
@@ -42,7 +85,7 @@ def dataset(vocab_dataset):
 def dataset_dev(vocab):
     dataset = Dataset(is_test=True)
     dataset.load_file("test/data/sample_dataset_dev.txt", vocab)
-    return data
+    return dataset
 
 
 @pytest.fixture(scope="session")

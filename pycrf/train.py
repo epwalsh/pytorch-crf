@@ -245,30 +245,49 @@ def main(args: List[str] = None) -> None:
     if not opts:
         return
 
+    # Ensure we were given a path to a training object or training text files
+    # and pretrained word vectors text file.
+    if not opts.train_object and not opts.train and not opts.word_vectors:
+        missing = "train" if not opts.train else "word-vectors"
+        parser.print_usage()
+        print(f"train.py: error: missing required argument --{missing}", flush=True)
+        return
+
     # Get the device to train on.
     device = get_device(opts)
 
-    # Load pretrained word embeddings and initialize vocab.
-    print(f"Loading pretrained word vectors from {opts.word_vectors}", flush=True)
-    pretrained_vecs, terms_itos, terms_stoi = load_pretrained(opts.word_vectors)
-    vocab = Vocab(terms_stoi, terms_itos, default_context=opts.default_context)
-
-    # Load datasets.
-    print("Loading datasets", flush=True)
     dataset_train = Dataset()
     dataset_valid = Dataset(is_test=True)
-    for fname in opts.train:
-        context, path = _parse_data_path(fname)
-        dataset_train.load_file(path, vocab, device=device, sent_context=context)
+    vocab: Vocab
+    pretrained_vecs: torch.Tensor
 
-    print(f"Loaded {len(dataset_train):d} sentences for training", flush=True)
+    if opts.train_object:
+        print(f"Loading training state object from {opts.train_object}", flush=True)
+        train_object = torch.load(opts.train_object)
+        vocab = train_object["vocab"]
+        pretrained_vecs = train_object["word_vectors"]
+        dataset_train = train_object["train"]
+        dataset_valid = train_object["validation"]
+    else:
+        # Load pretrained word embeddings and initialize vocab.
+        print(f"Loading pretrained word vectors from {opts.word_vectors}", flush=True)
+        pretrained_vecs, terms_itos, terms_stoi = load_pretrained(opts.word_vectors)
+        vocab = Vocab(terms_stoi, terms_itos, default_context=opts.default_context)
 
-    if opts.validation:
-        for fname in opts.validation:
+        # Load datasets.
+        print("Loading datasets", flush=True)
+        for fname in opts.train:
             context, path = _parse_data_path(fname)
-            dataset_valid.load_file(path, vocab, device=device, sent_context=context)
+            dataset_train.load_file(path, vocab, device=device, sent_context=context)
 
-        print(f"Loaded {len(dataset_valid):d} sentences for validation", flush=True)
+        print(f"Loaded {len(dataset_train):d} sentences for training", flush=True)
+
+        if opts.validation:
+            for fname in opts.validation:
+                context, path = _parse_data_path(fname)
+                dataset_valid.load_file(path, vocab, device=device, sent_context=context)
+
+            print(f"Loaded {len(dataset_valid):d} sentences for validation", flush=True)
 
     print("Found the following labels:", list(vocab.labels_stoi.keys()))
     if len(vocab.sent_context_stoi) > 1:
