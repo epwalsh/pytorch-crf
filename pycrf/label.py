@@ -38,10 +38,10 @@ def label_data(opts: argparse.Namespace,
         cursors = []
         for fname in opts.data:
             context, path = _parse_data_path(fname)
-            cursor = Dataset.read_file(path, model.vocab, device=device,
-                                       test=True,
-                                       sent_context=context)
-            cursors.append(cursor)
+            cursor_ = Dataset.read_file(path, model.vocab, device=device,
+                                        test=True,
+                                        sent_context=context)
+            cursors.append(cursor_)
         cursor = chain(*cursors)
         for src, tgt, raw_src, raw_tgt in cursor:
             labs = list(tgt.cpu().numpy())

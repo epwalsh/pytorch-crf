@@ -1,9 +1,9 @@
 """Helpers funcs."""
 
-from typing import Tuple
+from typing import Tuple, Union
 
 
-def _parse_data_path(path: str) -> Tuple[str, str]:
+def _parse_data_path(path: str) -> Tuple[Union[str, None], str]:
     separated = path.split(":")
     if len(separated) == 1:
         return None, path
