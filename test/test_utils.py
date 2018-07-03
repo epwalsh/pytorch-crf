@@ -16,7 +16,7 @@ def test_check_equal():
     utils.assert_equal(a, b)
 
 
-cases = [
+cases1 = [
     (torch.tensor([1]), torch.ByteTensor([[1]]), None),
     (torch.tensor([1]), torch.ByteTensor([[1]]), 1),
     (torch.tensor([2]), torch.ByteTensor([[1, 1]]), None),
@@ -26,14 +26,14 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("inp, chk, max_len", cases)
+@pytest.mark.parametrize("inp, chk, max_len", cases1)
 def test_sequence_mask(inp, chk, max_len):
     """Test `sequence_mask()` method."""
     res = utils.sequence_mask(inp, max_len=max_len)
     utils.assert_equal(res, chk)
 
 
-cases = [
+cases2 = [
     (
         (torch.tensor([1, 1, 1]), 5),
         torch.tensor([1, 1, 1, 0, 0])
@@ -63,12 +63,12 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("inputs, check", cases)
+@pytest.mark.parametrize("inputs, check", cases2)
 def test_pad(inputs, check):
     utils.assert_equal(utils.pad(*inputs), check)
 
 
-cases = [
+cases3 = [
     (
         ([torch.tensor([1, 1]), torch.tensor([1, 1, 2])], torch.tensor([2, 3])),
         (torch.tensor([[1, 1, 2], [1, 1, 0]]), torch.tensor([3, 2]), torch.tensor([1, 0]))
@@ -80,7 +80,7 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("inputs, check", cases)
+@pytest.mark.parametrize("inputs, check", cases3)
 def test_sort_and_pad(inputs, check):
     padded, lens, idx = utils.sort_and_pad(*inputs)
     utils.assert_equal(padded, check[0])
@@ -88,7 +88,7 @@ def test_sort_and_pad(inputs, check):
     utils.assert_equal(idx, check[2])
 
 
-cases = [
+cases4 = [
     (
         (torch.tensor([[1, 2, 3], [3, 4, 1]]), torch.tensor([1, 0])),
         torch.tensor([[3, 4, 1], [1, 2, 3]])
@@ -100,6 +100,6 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("inputs, check", cases)
+@pytest.mark.parametrize("inputs, check", cases4)
 def test_unsort(inputs, check):
     utils.assert_equal(utils.unsort(*inputs), check)

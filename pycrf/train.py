@@ -27,7 +27,8 @@ from .io.vectors import load_pretrained
 from .logging import Logger
 from .modules import LSTMCRF
 from .optim import OPTIM_ALIASES
-from .opts import help_opts, base_opts, train_opts, MODEL_ALIASES
+from .opts import train_opts, MODEL_ALIASES, get_parser, parse_all, get_device
+from .utils import _parse_data_path
 
 
 def _get_checkpoint_path(path: str, epoch: int) -> str:
@@ -73,6 +74,7 @@ def train(opts: argparse.Namespace,
           optimizer: torch.optim.Optimizer,
           dataset_train: Dataset,
           dataset_valid: Dataset = None) -> None:
+    # pylint: disable=too-many-branches
     """
     Train a model on the given dataset.
 
@@ -121,80 +123,85 @@ def train(opts: argparse.Namespace,
     # ==========================================================================
 
     for epoch in range(start_epoch, opts.epochs):
-        logger.start_epoch(epoch)
+        try:
+            logger.start_epoch(epoch)
 
-        # Shuffle dataset.
-        dataset_train.shuffle()
+            # Shuffle dataset.
+            dataset_train.shuffle()
 
-        # Set model to train mode.
-        model.train()
-
-        # ======================================================================
-        # Loop through all mini-batches.
-        # ======================================================================
-
-        iteration = 0
-        while iteration < len(dataset_train):
-            # Zero out the gradient.
-            model.zero_grad()
+            # Set model to train mode.
+            model.train()
 
             # ==================================================================
-            # Loop through sentences in mini-batch.
+            # Loop through all mini-batches.
             # ==================================================================
 
-            batch_loss: torch.Tensor = 0.
-            for _ in range(min([opts.batch_size, n_examples - iteration])):
-                src, tgt = dataset_train[iteration]
+            iteration = 0
+            while iteration < len(dataset_train):
+                # Zero out the gradient.
+                model.zero_grad()
 
-                # Compute the loss.
-                loss = model(*src, tgt)
-                batch_loss += loss
+                # ==============================================================
+                # Loop through sentences in mini-batch.
+                # ==============================================================
 
-                logger.update(epoch, iteration, loss, model.named_parameters())
-                iteration += 1
+                batch_loss: torch.Tensor = 0.
+                for _ in range(min([opts.batch_size, n_examples - iteration])):
+                    src, tgt = dataset_train[iteration]
+
+                    # Compute the loss.
+                    loss = model(*src, tgt)
+                    batch_loss += loss
+
+                    logger.update(epoch, iteration, loss, model.named_parameters())
+                    iteration += 1
+
+                # ==============================================================
+                # End mini-batch.
+                # ==============================================================
+
+                # Compute the gradient.
+                batch_loss.backward()
+
+                # Clip gradients.
+                if opts.max_grad is not None:
+                    torch.nn.utils.clip_grad_value_(
+                        model.parameters(), opts.max_grad)
+
+                # Take a step.
+                optimizer.step()
 
             # ==================================================================
-            # End mini-batch.
+            # End all mini-batches.
             # ==================================================================
 
-            # Compute the gradient.
-            batch_loss.backward()
+            # Log the loss and duration of the epoch.
+            logger.end_epoch()
 
-            # Clip gradients.
-            if opts.max_grad is not None:
-                torch.nn.utils.clip_grad_value_(
-                    model.parameters(), opts.max_grad)
+            # Update optimizer.
+            optimizer.epoch_update(logger.epoch_loss)
 
-            # Take a step.
-            optimizer.step()
+            # Gather eval stats.
+            eval_stats = ModelStats(model.vocab.labels_itos, epoch=epoch)
 
-        # ======================================================================
-        # End all mini-batches.
-        # ======================================================================
+            # Evaluate on validation set.
+            if dataset_valid:
+                # Put model into evaluation mode.
+                model.eval()
+                for src, tgt in dataset_valid:
+                    labs = list(tgt.cpu().numpy())
+                    preds = model.predict(*src)[0][0]
+                    eval_stats.update(labs, preds)
 
-        # Log the loss and duration of the epoch.
-        logger.end_epoch()
+            logger.append_eval_stats(eval_stats, validation=bool(dataset_valid))
 
-        # Update optimizer.
-        optimizer.epoch_update(logger.epoch_loss)
-
-        # Gather eval stats.
-        eval_stats = ModelStats(model.vocab.labels_itos, epoch)
-
-        # Evaluate on validation set.
-        if dataset_valid:
-            # Put model into evaluation mode.
-            model.eval()
-            for src, tgt in dataset_valid:
-                labs = list(tgt.cpu().numpy())
-                preds = model.predict(*src)[0][0]
-                eval_stats.update(labs, preds)
-
-        logger.append_eval_stats(eval_stats, validation=bool(dataset_valid))
-
-        # Save checkpoint.
-        if opts.out:
-            save_checkpoint(model, optimizer, opts.out, epoch)
+        except KeyboardInterrupt:
+            print("Exiting early...")
+            break
+        finally:
+            # Save checkpoint.
+            if opts.out:
+                save_checkpoint(model, optimizer, opts.out, epoch)
 
     # ==========================================================================
     # End epochs.
@@ -223,16 +230,7 @@ def main(args: List[str] = None) -> None:
     None
 
     """
-    parser = argparse.ArgumentParser(add_help=False)
-    help_opts(parser)
-
-    # Parse initial option to check for 'help' flag.
-    initial_opts, _ = parser.parse_known_args(args=args)
-
-    # Add base options and parse again.
-    base_opts(parser)
-    train_opts(parser, require=not initial_opts.help)
-    initial_opts, _ = parser.parse_known_args(args=args)
+    initial_opts, parser = get_parser(args, train_opts)
 
     # Add optimizer-specific options.
     optim_class = OPTIM_ALIASES[initial_opts.optim]
@@ -243,41 +241,57 @@ def main(args: List[str] = None) -> None:
     char_feats_class = MODEL_ALIASES[initial_opts.char_features]
     char_feats_class.cl_opts(parser, require=not initial_opts.help)
 
-    # Check if we should display the help message and exit.
-    if initial_opts.help:
-        parser.print_help()
+    opts = parse_all(args, initial_opts, parser)
+    if not opts:
         return
 
-    # Parse the args again.
-    opts = parser.parse_args(args=args)
+    # Ensure we were given a path to a training object or training text files
+    # and pretrained word vectors text file.
+    if not opts.train_object and not opts.train and not opts.word_vectors:
+        missing = "train" if not opts.train else "word-vectors"
+        parser.print_usage()
+        print(f"train.py: error: missing required argument --{missing}", flush=True)
+        return
 
-    # Set the device to train on.
-    if opts.cuda:
-        device = torch.device("cuda", opts.gpu_id)
-    else:
-        if torch.cuda.is_available():
-            print("Warning: CUDA is available, but you have not used the --cuda flag")
-        device = torch.device("cpu")
+    # Get the device to train on.
+    device = get_device(opts)
 
-    # Load pretrained word embeddings and initialize vocab.
-    print(f"Loading pretrained word vectors from {opts.word_vectors}", flush=True)
-    pretrained_vecs, terms_itos, terms_stoi = load_pretrained(opts.word_vectors)
-    vocab = Vocab(terms_stoi, terms_itos)
-
-    # Load datasets.
-    print("Loading datasets", flush=True)
     dataset_train = Dataset()
-    dataset_valid = Dataset()
-    for fname in opts.train:
-        dataset_train.load_file(fname, vocab, device=device)
-    print("Loaded {:d} sentences for training".format(len(dataset_train)),
-          flush=True)
-    if opts.validation:
-        for fname in opts.validation:
-            dataset_valid.load_file(fname, vocab, device=device)
-        print("Loaded {:d} sentences for validation"
-              .format(len(dataset_valid)))
-    print("Training on labels:", list(vocab.labels_stoi.keys()))
+    dataset_valid = Dataset(is_test=True)
+    vocab: Vocab
+    pretrained_vecs: torch.Tensor
+
+    if opts.train_object:
+        print(f"Loading training state object from {opts.train_object}", flush=True)
+        train_object = torch.load(opts.train_object)
+        vocab = train_object["vocab"]
+        pretrained_vecs = train_object["word_vectors"]
+        dataset_train = train_object["train"]
+        dataset_valid = train_object["validation"]
+    else:
+        # Load pretrained word embeddings and initialize vocab.
+        print(f"Loading pretrained word vectors from {opts.word_vectors}", flush=True)
+        pretrained_vecs, terms_itos, terms_stoi = load_pretrained(opts.word_vectors)
+        vocab = Vocab(terms_stoi, terms_itos, default_context=opts.default_context)
+
+        # Load datasets.
+        print("Loading datasets", flush=True)
+        for fname in opts.train:
+            context, path = _parse_data_path(fname)
+            dataset_train.load_file(path, vocab, device=device, sent_context=context)
+
+        print(f"Loaded {len(dataset_train):d} sentences for training", flush=True)
+
+        if opts.validation:
+            for fname in opts.validation:
+                context, path = _parse_data_path(fname)
+                dataset_valid.load_file(path, vocab, device=device, sent_context=context)
+
+            print(f"Loaded {len(dataset_valid):d} sentences for validation", flush=True)
+
+    print("Found the following labels:", list(vocab.labels_stoi.keys()))
+    if len(vocab.sent_context_stoi) > 1:
+        print("Found the following sentence contexts:", list(vocab.sent_context_stoi))
 
     # Initialize the model.
     char_feats_layer = char_feats_class.cl_init(opts, vocab).to(device)
@@ -285,14 +299,10 @@ def main(args: List[str] = None) -> None:
     print(model, flush=True)
 
     # Initialize the optimizer.
-    optimizer = optim_class.cl_init(
-        filter(lambda p: p.requires_grad, model.parameters()), opts)
+    optimizer = optim_class.cl_init(filter(lambda p: p.requires_grad, model.parameters()), opts)
 
     # Train model.
-    try:
-        train(opts, model, optimizer, dataset_train, dataset_valid)
-    except KeyboardInterrupt:
-        print("Exiting early")
+    train(opts, model, optimizer, dataset_train, dataset_valid)
 
 
 if __name__ == "__main__":

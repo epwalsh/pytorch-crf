@@ -4,11 +4,12 @@ import argparse
 
 import torch
 import torch.nn as nn
-from torch.nn import LSTM, Embedding, Dropout
+from torch.nn import LSTM
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from pycrf.io import Vocab
 from pycrf.nn.utils import unsort
+from .char_embedding import CharEmbedding
 
 
 class CharLSTM(nn.Module):
@@ -47,11 +48,8 @@ class CharLSTM(nn.Module):
         The dimension of the output, which is
         ``layers * hidden_size * directions``.
 
-    embedding : torch.nn.Embedding
+    char_embedding : torch.nn.Embedding
         The character embedding layer.
-
-    embedding_dropout : torch.nn.Dropout
-        A dropout applied to the embedding features.
 
     rnn : torch.nn.LSTM
         The LSTM layer.
@@ -71,12 +69,9 @@ class CharLSTM(nn.Module):
         self.n_chars = n_chars
 
         # Character embedding layer.
-        self.embedding = \
-            Embedding(self.n_chars, embedding_size, padding_idx=padding_idx)
-
-        # Dropout applied to embeddings.
-        self.embedding_dropout = \
-            Dropout(p=dropout) if dropout else None
+        self.char_embedding = CharEmbedding(n_chars, embedding_size,
+                                            dropout=dropout,
+                                            padding_idx=padding_idx)
 
         # Recurrent layer.
         self.rnn = LSTM(input_size=embedding_size,
@@ -121,12 +116,8 @@ class CharLSTM(nn.Module):
         sent_length = inputs.size()[0]
 
         # Pass inputs through embedding layer.
-        inputs_emb = self.embedding(inputs)
+        inputs_emb = self.char_embedding(inputs)
         # inputs_emb: ``[sent_length x max_word_length x embedding_size]``
-
-        # Apply dropout to embeddings.
-        if self.embedding_dropout:
-            inputs_emb = self.embedding_dropout(inputs_emb)
 
         # Turned the padded inputs into a packed sequence.
         packed = pack_padded_sequence(inputs_emb, lengths, batch_first=True)
@@ -150,18 +141,13 @@ class CharLSTM(nn.Module):
         # pylint: disable=unused-argument
         """Define command-line options specific to this model."""
         group = parser.add_argument_group("Character LSTM options")
+        CharEmbedding.cl_opts(group)
         group.add_argument(
             "--char-hidden-dim",
             type=int,
             default=50,
             help="""Dimension of the hidden layer for the character-level
             LSTM. Default is 50."""
-        )
-        group.add_argument(
-            "--char-embedding-size",
-            type=int,
-            default=50,
-            help="""The dimension of the character embedding layer."""
         )
 
     @classmethod

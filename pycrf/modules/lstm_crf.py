@@ -46,6 +46,9 @@ class LSTMCRF(nn.Module):
     freeze_embeddings : bool, optional (default: True)
         If True, word embeddings will not be updated during training.
 
+    sent_context_embedding : int, optional (default: 5)
+        Size of sentence-level context embedding.
+
     Attributes
     ----------
     vocab : pycrf.io.Vocab
@@ -74,6 +77,9 @@ class LSTMCRF(nn.Module):
         The linear layer that maps the hidden states from the recurrent layer
         to the label space.
 
+    sent_context_embedding : nn.Module
+        Embedding for sentence-level context.
+
     """
 
     def __init__(self,
@@ -81,6 +87,7 @@ class LSTMCRF(nn.Module):
                  char_feats_layer: torch.nn.Module,
                  crf: ConditionalRandomField,
                  pretrained_word_vecs: torch.Tensor,
+                 sent_context_embedding: int = 5,
                  hidden_dim: int = 100,
                  layers: int = 1,
                  dropout: float = 0.,
@@ -103,12 +110,23 @@ class LSTMCRF(nn.Module):
         self.word_embedding = \
             nn.Embedding.from_pretrained(pretrained_word_vecs, freeze=freeze_embeddings)
 
+        # Sentence-level context embedding.
+        n_contexts = len(self.vocab.sent_context_stoi)
+        if n_contexts > 1:
+            self.sent_context_embedding = nn.Embedding(
+                n_contexts, sent_context_embedding)
+        else:
+            self.sent_context_embedding = None
+
         # Recurrent layer. Takes as input the concatenation of the
         # char_feats_layer final hidden state and pre-trained embedding for
         # each word. The dimension of the output is given by
         # self.rnn_output_size (see below).
+        rnn_input_size = self.word_vec_dim + char_feats_layer.output_size
+        if self.sent_context_embedding:
+            rnn_input_size += sent_context_embedding
         self.rnn = nn.LSTM(
-            input_size=self.word_vec_dim + char_feats_layer.output_size,
+            input_size=rnn_input_size,
             hidden_size=hidden_dim,
             num_layers=layers,
             bidirectional=bidirectional,
@@ -132,7 +150,8 @@ class LSTMCRF(nn.Module):
                words: torch.Tensor,
                word_lengths: torch.Tensor,
                word_indices: torch.Tensor,
-               word_idxs: torch.Tensor) -> torch.Tensor:
+               word_idxs: torch.Tensor,
+               sent_context: torch.Tensor) -> torch.Tensor:
         """
         Generate features for the CRF from input.
 
@@ -158,12 +177,17 @@ class LSTMCRF(nn.Module):
         word_idxs : torch.Tensor
             Word indices with shape ``[sent_length]``.
 
+        sent_context : torch.Tensor
+            Sentence context.
+
         Returns
         -------
         torch.Tensor
             ``[batch_size x sent_length x crf.n_labels]``
 
         """
+        sent_length = words.size(0)
+
         # Run each word character-by-character through the CharLSTM to generate
         # character-level word features.
         char_feats = self.char_feats_layer(words, word_lengths, word_indices)
@@ -173,15 +197,29 @@ class LSTMCRF(nn.Module):
         word_embs = self.word_embedding(word_idxs)
         # word_embs: ``[sent_length x self.word_vec_dim]``
 
-        # Concatenate the character-level word features and word embeddings.
-        word_feats = torch.cat([char_feats, word_embs], dim=-1)
-        # word_feats: ``[sent_length x
-        #                (char_feats_layer.output_size + self.word_vec_dim)]``
+        # Concatenate the character-level word features, word embeddings, and
+        # sentence-level context embedding.
+        if self.sent_context_embedding:
+            # Embed sentence-level context.
+            context_embs = self.sent_context_embedding(sent_context)
+            # context_embs: ``[1 x sent_context_embedding_size]``
+
+            context_embs = context_embs.expand(sent_length, -1)
+            # context_embs: ``[sent_length x sent_context_embedding_size]``.
+
+            word_feats = torch.cat([char_feats, word_embs, context_embs], dim=-1)
+            # word_feats: ``[sent_length x (char_feats_layer.output_size +
+            #                               self.word_vec_dim +
+            #                               sent_context_embedding_size)]``
+        else:
+            word_feats = torch.cat([char_feats, word_embs], dim=-1)
+            # word_feats: ``[sent_length x (char_feats_layer.output_size +
+            #                               self.word_vec_dim)]``
 
         # Add a fake batch dimension.
         word_feats = word_feats.unsqueeze(0)
-        # word_feats: ``[1 x sent_length x
-        #                (char_feats_layer.output_size + self.word_vec_dim)]``
+        # word_feats: ``[1 x sent_length x (char_feats_layer.output_size +
+        #                                   self.word_vec_dim)]``
 
         # Apply dropout.
         if self.dropout:
@@ -207,6 +245,7 @@ class LSTMCRF(nn.Module):
                 word_lengths: torch.Tensor,
                 word_indices: torch.Tensor,
                 word_idxs: torch.Tensor,
+                sent_context: torch.Tensor,
                 lens: torch.Tensor = None) -> List[Tuple[List[int], float]]:
         # pylint: disable=not-callable
         """
@@ -228,6 +267,9 @@ class LSTMCRF(nn.Module):
         word_idxs : torch.Tensor
             Word indices with shape ``[sent_length]``.
 
+        sent_context : torch.Tensor
+            Sentence context.
+
         lens : torch.Tensor, optional (default: None)
             Gives the length of each sentence in the batch ``[batch_size]``.
 
@@ -242,7 +284,8 @@ class LSTMCRF(nn.Module):
         mask = sequence_mask(lens)
 
         # Gather word feats.
-        feats = self._feats(words, word_lengths, word_indices, word_idxs)
+        feats = self._feats(
+            words, word_lengths, word_indices, word_idxs, sent_context)
         # feats: ``[1 x sent_length x n_labels]``
 
         # Run features through Viterbi decode algorithm.
@@ -255,6 +298,7 @@ class LSTMCRF(nn.Module):
                 word_lengths: torch.Tensor,
                 word_indices: torch.Tensor,
                 word_idxs: torch.Tensor,
+                sent_context: torch.Tensor,
                 labs: torch.Tensor,
                 lens: torch.Tensor = None) -> torch.Tensor:
         # pylint: disable=arguments-differ,not-callable
@@ -277,6 +321,9 @@ class LSTMCRF(nn.Module):
         word_idxs : torch.Tensor
             Word indices with shape ``[sent_length]``.
 
+        sent_context : torch.Tensor
+            Sentence context.
+
         labs : torch.Tensor
             Corresponding target label sequence with shape ``[sent_length]``.
 
@@ -298,7 +345,8 @@ class LSTMCRF(nn.Module):
         # labs: ``[1 x sent_length]``
 
         # Gather word feats.
-        feats = self._feats(words, word_lengths, word_indices, word_idxs)
+        feats = self._feats(
+            words, word_lengths, word_indices, word_idxs, sent_context)
         # feats: ``[1 x sent_length x n_labels]``
 
         loglik = self.crf(feats, labs, mask=mask)
@@ -307,6 +355,7 @@ class LSTMCRF(nn.Module):
 
     @staticmethod
     def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
+        # pylint: disable=unused-argument
         """Define command-line options specific to this model."""
         group = parser.add_argument_group("Bi-LSTM CRF options")
         group.add_argument(
@@ -323,10 +372,10 @@ class LSTMCRF(nn.Module):
             training process."""
         )
         group.add_argument(
-            "--word-vectors",
-            type=str,
-            required=require,
-            help="""Path to pretrained word vectors."""
+            "--sent-context-dim",
+            type=int,
+            default=5,
+            help="""Embedding size of sentence-level context. Default is 5."""
         )
 
     @classmethod
@@ -340,4 +389,5 @@ class LSTMCRF(nn.Module):
         return cls(vocab, char_feats_layer, crf, word_vecs,
                    hidden_dim=opts.hidden_dim,
                    dropout=opts.dropout,
-                   freeze_embeddings=not opts.update_word_embeddings)
+                   freeze_embeddings=not opts.update_word_embeddings,
+                   sent_context_embedding=opts.sent_context_dim)

@@ -1,9 +1,14 @@
+# Core requirements.
 torch>=0.4.0
 numpy
-tensorflow
-tensorboard
+
+# Only needed for testing.
 pytest
 pytest-cov
 mypy
 pylint
 pydocstyle
+
+# Only needed to use tensorboard.
+tensorflow
+tensorboard

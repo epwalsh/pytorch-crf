@@ -8,7 +8,7 @@ import torch
 from pycrf.nn.utils import sort_and_pad
 
 
-SourceType = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+SourceType = Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
 TargetType = Type[torch.Tensor]
 
 
@@ -77,6 +77,9 @@ class Vocab:
     words_itos : dict
         Keys are ints, values are lowercase words.
 
+    sent_context_stoi : dict
+        Dict lookup of index of sentence-level context.
+
     """
 
     def __init__(self,
@@ -84,13 +87,13 @@ class Vocab:
                  words_itos: Dict[int, str],
                  labels: List[str] = None,
                  default_label: str = "O",
+                 default_context: str = "default",
                  unk_term: str = "UNK",
                  pad_char: str = "PAD",
                  unk_char: str = "UNK") -> None:
         self.default_label = default_label
         self.labels_stoi = {default_label: 0}
         self.labels_itos = {0: default_label}
-
         self.unk_term = unk_term
         self.unk_char = unk_char
         self.pad_char = pad_char
@@ -98,6 +101,7 @@ class Vocab:
         self.chars_itos = {0: pad_char, 1: unk_char}
         self.words_stoi = words_stoi
         self.words_itos = words_itos
+        self.sent_context_stoi: Dict[str, int] = {default_context: 0}
 
         for lab in labels or []:
             ind = self.labels_stoi.setdefault(lab, len(self.labels_stoi))
@@ -128,7 +132,9 @@ class Vocab:
 
     def sent2tensor(self,
                     sent: List[str],
-                    device: torch.device = None) -> SourceType:
+                    device: torch.device = None,
+                    sent_context: str = None,
+                    test: bool = False) -> SourceType:
         # pylint: disable=not-callable
         """
         Transform a sentence into a tensor.
@@ -141,6 +147,12 @@ class Vocab:
         device : torch.device, optional
             The device to send the tensors to.
 
+        sent_context : str, optional
+            The sentence-level context.
+
+        test : bool
+            Whether or this is for a new test sentence.
+
         Returns
         -------
         SourceType
@@ -148,12 +160,26 @@ class Vocab:
             representation. The second item is the lengths of those words as
             defined by the number of characters. The third item is the sorted
             indices of the words so that the original order can be retained,
-            and the fourth is an unsorted tensor of word ids.
+            and the fourth is an unsorted tensor of word ids. The fourth item
+            is a scalar value representing the sentence-level context. If no
+            context is given, the fourth item will be None.
 
         """
+        # Encode sentence-level context.
+        if sent_context is not None:
+            if test:
+                context_i = self.sent_context_stoi.get(sent_context, 0)
+            else:
+                context_i = self.sent_context_stoi.setdefault(
+                    sent_context, len(self.sent_context_stoi))
+                self.sent_context_stoi[sent_context] = context_i
+            context = torch.tensor(context_i)
+        else:
+            context = None
+
         # Encode words and characters.
         word_lengths_list: List[int] = []           # length of each word.
-        word_idx_list: List[torch.Tensor] = []  # words represented by their vector embedding.
+        word_idx_list: List[torch.Tensor] = []      # words represented by their vector embedding.
         word_tensors_list: List[torch.Tensor] = []  # words represented by their characters.
         for tok in sent:
             word_lengths_list.append(len(tok))
@@ -179,12 +205,15 @@ class Vocab:
                 lens.to(device), \
                 idxs.to(device), \
                 word_idxs.to(device)
+            if context is not None:
+                context = context.to(device)
 
-        return word_tensors, lens, idxs, word_idxs
+        return word_tensors, lens, idxs, word_idxs, context
 
     def labs2tensor(self,
                     labs: List[str],
-                    device: torch.device = None) -> TargetType:
+                    device: torch.device = None,
+                    test: bool = False) -> TargetType:
         # pylint: disable=not-callable
         """
         Transform a list of labels to a tensor.
@@ -197,6 +226,9 @@ class Vocab:
         device : torch.device, optional
             The device to send the tensors to.
 
+        test : bool
+            Whether or this is for a new test sentence.
+
         Returns
         -------
         torch.Tensor
@@ -205,9 +237,12 @@ class Vocab:
         """
         lab_ids = []
         for lab in labs:
-            i = self.labels_stoi.setdefault(lab, len(self.labels_stoi))
+            if test:
+                i = self.labels_stoi.get(lab, 0)
+            else:
+                i = self.labels_stoi.setdefault(lab, len(self.labels_stoi))
+                self.labels_itos[i] = lab
             lab_ids.append(i)
-            self.labels_itos[i] = lab
         target = torch.tensor(lab_ids)
         if device is not None:
             target = target.to(device)

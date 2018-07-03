@@ -148,7 +148,7 @@ class ModelStats:
 
     def __init__(self,
                  labels_itos: Dict[int, str],
-                 epoch: int,
+                 epoch: int = None,
                  loss: float = 0.) -> None:
         self.labels_itos = labels_itos
         self.correct_labels = 0

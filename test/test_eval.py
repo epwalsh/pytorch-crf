@@ -11,7 +11,7 @@ from pycrf.eval import \
     Scheme
 
 
-cases = [
+cases1 = [
     (
         [0, 1, 2],
         {0: "O", 1: "B-A", 2: "I-A"},
@@ -45,14 +45,14 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("tags, lab_itos, chunks", cases)
+@pytest.mark.parametrize("tags, lab_itos, chunks", cases1)
 def test_iob_to_spans(vocab_dataset, tags, lab_itos, chunks):
     vocab, _ = vocab_dataset
     result = iob_to_spans(tags, lab_itos)
     assert result == chunks
 
 
-cases = [
+cases2 = [
     (
         [0, 1, 2],
         {0: "O", 1: "B-A", 2: "I-A"},
@@ -106,14 +106,14 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("tags, lab_itos, chunks", cases)
+@pytest.mark.parametrize("tags, lab_itos, chunks", cases2)
 def test_iobes_to_spans(vocab_dataset, tags, lab_itos, chunks):
     vocab, _ = vocab_dataset
     result = iobes_to_spans(tags, lab_itos)
     assert result == chunks
 
 
-cases = [
+cases3 = [
     (
         ["B-A", "I-A", "O"],
         Scheme.IOB
@@ -125,23 +125,23 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("labels, check", cases)
+@pytest.mark.parametrize("labels, check", cases3)
 def test_detect_label_scheme(labels, check):
     assert _detect_label_scheme(labels) == check
 
 
-cases = [
+cases4 = [
     (["B"]),
 ]
 
 
-@pytest.mark.parametrize("labels", cases)
+@pytest.mark.parametrize("labels", cases4)
 def test_detect_label_scheme_errors(labels):
     with pytest.raises(ValueError):
         _detect_label_scheme(labels)
 
 
-cases = [
+cases5 = [
     (
         [
             ([0, 0, 0, 0], [0, 0, 0, 0]),
@@ -169,7 +169,7 @@ cases = [
 ]
 
 
-@pytest.mark.parametrize("sentences, f1, precision, recall, accuracy", cases)
+@pytest.mark.parametrize("sentences, f1, precision, recall, accuracy", cases5)
 def test_eval_stats(get_model_stats, sentences, f1, precision, recall, accuracy):
     eval_stats = get_model_stats(sentences)
     f1_, precision_, recall_, accuracy_ = eval_stats.score
