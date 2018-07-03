@@ -15,8 +15,6 @@ from typing import List, Tuple, Dict, Optional
 
 import torch
 
-import allennlp.nn.util as util
-
 
 logger = logging.getLogger(__name__)
 
@@ -489,7 +487,7 @@ class ConditionalRandomField(torch.nn.Module):
 
             # We pass the tags and the transitions to ``viterbi_decode``.
             viterbi_path, viterbi_score = \
-                util.viterbi_decode(tag_sequence[:(sequence_length + 2)], transitions)
+                viterbi_decode(tag_sequence[:(sequence_length + 2)], transitions)
             # Get rid of START and END sentinels and append.
             viterbi_path = viterbi_path[1:-1]
             best_paths.append((viterbi_path, viterbi_score.item()))

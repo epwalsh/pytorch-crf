@@ -51,10 +51,10 @@ class Logger:
         self.eval_stats: List[ModelStats] = []
 
         self.train_start_time: float = time.time()
-        self.epoch_start_time: float = None
-        self.running_time: float = None
-        self.epoch_duration: float = None
-        self.time_to_epoch: float = None
+        self.epoch_start_time: float
+        self.running_time: float
+        self.epoch_duration: float
+        self.time_to_epoch: float
 
         self.epoch_loss = 0.
         self.running_loss = 0.

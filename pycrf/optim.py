@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractstaticmethod, abstractclassmethod
 import argparse
-from typing import Iterable, Dict, Type
+from typing import Iterable, Dict, Type, Union
 
 import torch
 
@@ -278,8 +278,8 @@ class SGD(torch.optim.SGD, CLOptim):
         self.decay_start = decay_start
         self.conditional_decay = conditional_decay
         self.initial_lr: float = kwargs["lr"]
-        self.epoch = 0
-        self.last_loss: float = None
+        self.epoch: int = 0
+        self.last_loss: Union[None, float] = None
 
     @staticmethod
     def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
@@ -347,7 +347,8 @@ class SGD(torch.optim.SGD, CLOptim):
         """Update the learning rate."""
         self.epoch += 1
         if self.decay_rate > 0 and self.decay_start <= self.epoch:
-            if not self.conditional_decay or self.last_loss <= loss:
+            last_loss_less = self.last_loss is not None and self.last_loss <= loss
+            if not self.conditional_decay or last_loss_less:
                 self.lr = self.initial_lr / (1 + self.decay_rate * self.epoch)
                 print(f"Updating learning rate to {self.lr}", flush=True)
         self.last_loss = loss

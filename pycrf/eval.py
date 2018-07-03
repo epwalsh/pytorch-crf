@@ -1,7 +1,7 @@
 """Evaluation statistics."""
 
 from enum import Enum
-from typing import Iterable, Dict, Set, List
+from typing import Iterable, Dict, Set, List, Union
 
 
 class Scheme(Enum):
@@ -18,7 +18,7 @@ def iob_to_spans(sequence: Iterable,
     """Convert to IOB to span."""
     iobtype = 2 if strict_iob2 else 1
     chunks: List[str] = []
-    current: List[str] = None
+    current: Union[List[str], None] = None
 
     for i, y in enumerate(sequence):
         label = lut[y]
@@ -64,7 +64,7 @@ def iobes_to_spans(sequence: Iterable,
     """Convert to IOBES to span."""
     iobtype = 2 if strict_iob2 else 1
     chunks: List[str] = []
-    current: List[str] = None
+    current: Union[List[str], None] = None
 
     for i, y in enumerate(sequence):
         label = lut[y]
@@ -158,7 +158,7 @@ class ModelStats:
         self.overlap_count = 0
         self.loss = loss
         self.epoch = epoch
-        self.time_to_epoch: float = None
+        self.time_to_epoch: Union[float, None] = None
         self._scheme = \
             _detect_label_scheme([lab for _, lab in labels_itos.items()])
         self.span_getter = iob_to_spans \
