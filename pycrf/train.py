@@ -9,7 +9,6 @@ The training script itself is invoked with:
 
 You can see all of the options available for a specific character-level
 feature model or optimizer with:
-
 .. code-block:: bash
 
   python -m pycrf.train --help --char-features MODEL_NAME --optim OPTIM_NAME
@@ -178,6 +177,11 @@ def train(opts: argparse.Namespace,
             # Log the loss and duration of the epoch.
             logger.end_epoch()
 
+            # Record additional metrics.
+            logger.record({
+                "lr": optimizer.lr,
+            }, epoch + 1)
+
             # Update optimizer.
             optimizer.epoch_update(logger.epoch_loss)
 
@@ -193,6 +197,7 @@ def train(opts: argparse.Namespace,
                     preds = model.predict(*src)[0][0]
                     eval_stats.update(labs, preds)
 
+            # Record loss and validation set metrics.
             logger.append_eval_stats(eval_stats, validation=bool(dataset_valid))
 
         except KeyboardInterrupt:

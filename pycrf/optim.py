@@ -2,9 +2,12 @@
 
 from abc import ABC, abstractstaticmethod, abstractclassmethod
 import argparse
+import sys
 from typing import Iterable, Dict, Type, Union
+from warnings import warn
 
 import torch
+import numpy as np
 
 
 class CLOptim(ABC):
@@ -272,14 +275,36 @@ class SGD(torch.optim.SGD, CLOptim):
                  decay_rate: float = 0.,
                  decay_start: int = 0,
                  conditional_decay: bool = False,
+                 cyclic: bool = False,
+                 cycle_len: int = 10,
+                 cycle_mult: int = None,
+                 lr: float = None,
                  **kwargs) -> None:
-        super(SGD, self).__init__(params, **kwargs)
         self.decay_rate = decay_rate
         self.decay_start = decay_start
         self.conditional_decay = conditional_decay
-        self.initial_lr: float = kwargs["lr"]
+        self.initial_lr: float = lr
         self.epoch: int = 0
         self.last_loss: Union[None, float] = None
+        self.cyclic = cyclic
+        self.cycle_len = cycle_len
+        self.cycle_mult = cycle_mult
+        self._cycle_fact: float = 1.
+        self._cycle_counter: int = 1
+
+        kwargs["lr"] = lr
+        super(SGD, self).__init__(params, **kwargs)
+
+    @property
+    def lr(self):
+        """Get the learning rate."""
+        return self.param_groups[0]["lr"]
+
+    @lr.setter
+    def lr(self, value: float) -> None:
+        """Set the learning rate."""
+        for param_group in self.param_groups:
+            param_group["lr"] = value
 
     @staticmethod
     def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
@@ -328,11 +353,32 @@ class SGD(torch.optim.SGD, CLOptim):
             help="""If set, learning rate decay will only happen when the loss
             does not decrease from the previous round."""
         )
+        group.add_argument(
+            "--cycle_len",
+            type=int,
+            help="""Cycle length (in epochs) for a cyclic learning rate annealing
+            schedule."""
+        )
+        group.add_argument(
+            "--cycle_mult",
+            type=float,
+            help="""Factor by which the cyclic annealing schedule is slowed."""
+        )
         return None
 
     @classmethod
     def cl_init(cls, params: Iterable, opts: argparse.Namespace):
         """Initialize SGD from command line options."""
+        kwargs = {}
+        if opts.cycle_len:
+            kwargs["cycle_len"] = opts.cycle_len
+            kwargs["cyclic"] = True
+            if opts.cycle_mult:
+                kwargs["cycle_mult"] = opts.cycle_mult
+        elif opts.cycle_mult:
+            warn("Unused option: '--cycle_mult'. If you want to use a cyclic learning "
+                 "rate schedule, you must specify the option '--cycle_len' as well.")
+            sys.stderr.flush()
         return cls(params,
                    decay_rate=opts.decay_rate,
                    lr=opts.lr,
@@ -340,18 +386,66 @@ class SGD(torch.optim.SGD, CLOptim):
                    nesterov=opts.nesterov,
                    weight_decay=opts.weight_decay,
                    decay_start=opts.decay_start,
-                   conditional_decay=opts.conditional_decay)
+                   conditional_decay=opts.conditional_decay,
+                   **kwargs)
+
+    def _vanilla_decay(self, loss: float) -> None:
+        # pylint: disable=attribute-defined-outside-init
+        """
+        Perform 'vanilla' LR decay.
+
+        This just follows a simple annealing schedule in which the LR is decreased
+        by a factor at the end of each epoch.
+        """
+        # Check if we should decrease the learning rate.
+        if self.decay_rate > 0 and self.decay_start <= self.epoch:
+            last_loss_less: bool = self.last_loss is not None and self.last_loss <= loss
+            # Decrease the learning rate if `self.conditional_decay = False` or
+            # if `self.conditional_decay = True` and the loss has not decreased
+            # from the previous round.
+            if not self.conditional_decay or last_loss_less:
+                self.lr = self.initial_lr / (1 + self.decay_rate * self.epoch)
+                print(f"Updating learning rate to {self.lr}", flush=True)
+
+        # Update the latest loss.
+        self.last_loss = loss
+
+    def _cyclic_decay(self) -> None:
+        # pylint: disable=attribute-defined-outside-init
+        """
+        Perform cyclic LR decay.
+
+        See http://arxiv.org/abs/1704.00109.
+        """
+        updated_cycle_len = int(self._cycle_fact * self.cycle_len)
+        if self.cycle_mult and \
+                self.epoch > 1 and \
+                (self._cycle_counter) % updated_cycle_len == 0:
+            # Adjust the cycle length.
+            self._cycle_fact *= self.cycle_mult
+            self._cycle_counter = 0
+        self.lr = \
+            (self.initial_lr / 2) * \
+            (
+                np.cos(
+                    np.pi * (
+                        (self._cycle_counter) % updated_cycle_len
+                    ) / updated_cycle_len
+                )
+                + 1
+            )
+        self._cycle_counter += 1
+        print(f"Updating learning rate to {self.lr}", flush=True)
 
     def epoch_update(self, loss: float) -> None:
         # pylint: disable=invalid-name,attribute-defined-outside-init
         """Update the learning rate."""
         self.epoch += 1
-        if self.decay_rate > 0 and self.decay_start <= self.epoch:
-            last_loss_less = self.last_loss is not None and self.last_loss <= loss
-            if not self.conditional_decay or last_loss_less:
-                self.lr = self.initial_lr / (1 + self.decay_rate * self.epoch)
-                print(f"Updating learning rate to {self.lr}", flush=True)
-        self.last_loss = loss
+
+        if not self.cyclic:
+            self._vanilla_decay(loss)
+        else:
+            self._cyclic_decay()
 
 
 OPTIM_ALIASES: Dict[str, Type[CLOptim]] = {

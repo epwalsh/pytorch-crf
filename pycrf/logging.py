@@ -2,7 +2,7 @@
 
 import time
 import datetime
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 import torch
@@ -156,6 +156,11 @@ class Logger:
 
         return best_epoch.epoch
 
+    def record(self, metrics: Dict[str, float], iteration: int) -> None:
+        """Record metrics to tensorboard."""
+        for tag, value in metrics.items():
+            self.scalar_summary(tag, value, iteration)
+
     def append_eval_stats(self,
                           eval_stats: ModelStats,
                           validation: bool = False) -> None:
@@ -171,9 +176,7 @@ class Logger:
         eval_stats.loss = self.epoch_loss
         eval_stats.time_to_epoch = self.time_to_epoch
         self.eval_stats.append(eval_stats)
-        if self.writer is not None:
-            for tag, value in info.items():
-                self.scalar_summary(tag, value, eval_stats.epoch + 1)
+        self.record(info, eval_stats.epoch + 1)
 
     def update(self,
                epoch: int,

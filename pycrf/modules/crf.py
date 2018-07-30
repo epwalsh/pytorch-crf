@@ -1,4 +1,9 @@
 # ==============================================================================
+
+#  This module was adapted directly from AllenAI:
+#  https://github.com/allenai/allennlp/blob/master/allennlp/modules/conditional_random_field.py
+#
+#  Here is the original copyright notice:
 #
 #  Copyright (c) 2018 AllenAI
 #
@@ -10,13 +15,11 @@
 
 """Conditional random field."""
 
-import logging
+import sys
 from typing import List, Tuple, Dict, Optional
+from warnings import warn
 
 import torch
-
-
-logger = logging.getLogger(__name__)
 
 
 def logsumexp(tensor: torch.Tensor,
@@ -118,9 +121,10 @@ def viterbi_decode(tag_sequence: torch.Tensor,
         # invalid/extremely unlikely evidence.
         if tag_observations[timestep - 1] != -1:
             if transition_matrix[tag_observations[timestep - 1], observation] < -10000:
-                logger.warning("The pairwise potential between tags you have passed as "
-                               "observations is extremely unlikely. Double check your evidence "
-                               "or transition potentials!")
+                warn("The pairwise potential between tags you have passed as "
+                     "observations is extremely unlikely. Double check your evidence "
+                     "or transition potentials!")
+                sys.stderr.flush()
         if observation != -1:
             one_hot = torch.zeros(num_tags)
             one_hot[observation] = 100000.
