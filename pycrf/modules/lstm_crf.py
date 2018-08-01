@@ -1,14 +1,18 @@
 """Defines a Bi-LSMT CRF model."""
 
 import argparse
-from typing import List, Tuple
+from itertools import chain, filterfalse
+from typing import List, Tuple, Any, Dict, Union
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from pycrf.io import Vocab
 from pycrf.nn.utils import sequence_mask
 from .crf import ConditionalRandomField
+
+
+LRsType = Union[Tuple[float], Tuple[float, float]]
 
 
 class LSTMCRF(nn.Module):
@@ -107,6 +111,7 @@ class LSTMCRF(nn.Module):
 
         # Word-embedding layer.
         self.word_vec_dim = pretrained_word_vecs.size()[1]
+        self._freeze_embeddings = freeze_embeddings
         self.word_embedding = \
             nn.Embedding.from_pretrained(pretrained_word_vecs, freeze=freeze_embeddings)
 
@@ -145,6 +150,37 @@ class LSTMCRF(nn.Module):
 
         # Conditional Random Field that maps word features into labels.
         self.crf = crf
+
+    def get_trainable_params(self,
+                             lrs: LRsType = None) -> List[Dict[str, Any]]:
+        """Return list of trainable parameter groups."""
+        out: List[Dict[str, Any]] = []
+
+        # Add word-embedding parameters if those are trainable.
+        if not self._freeze_embeddings:
+            out.append({
+                "params": self.word_embedding.parameters()
+            })
+
+        # Add the parameters from all ther layers modules.
+        module_params = [
+            self.char_feats_layer.parameters(),
+            self.rnn.parameters(),
+            self.rnn_to_crf.parameters(),
+            self.crf.parameters()
+        ]
+        if self.sent_context_embedding:
+            module_params.append(self.sent_context_embedding.parameters())
+        out.append({
+            "params": filterfalse(lambda p: not p.requires_grad, chain(*module_params))
+        })
+
+        # Optionally add learning rates directly to param groups as well.
+        if lrs:
+            for param_group, lr in zip(out, lrs):
+                param_group["lr"] = lr
+
+        return out
 
     def _feats(self,
                words: torch.Tensor,

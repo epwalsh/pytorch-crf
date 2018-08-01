@@ -5,30 +5,28 @@ from pycrf.optim import SGD
 
 def test_vanilla_decay(lstm_crf):
     """Ensure that vanilla decay schedule works as expected."""
-    sgd = SGD(filter(lambda p: p.requires_grad, lstm_crf.parameters()),
-              lr=1.0,
+    sgd = SGD(lstm_crf.get_trainable_params((1.0,)),
               decay_rate=0.5,
               decay_start=0,
               conditional_decay=False)
 
     sgd.epoch_update(10)
-    assert sgd.lr == 1.0 / (1 + 0.5 * 1)
+    assert sgd.lr[0] == 1.0 / (1 + 0.5 * 1)
 
     sgd.epoch_update(10)
-    assert sgd.lr == 1.0 / (1 + 0.5 * 2)
+    assert sgd.lr[0] == 1.0 / (1 + 0.5 * 2)
 
 
 def test_cyclic_decay(lstm_crf):
     """Ensure cyclic LR annealing schedule works as expected."""
-    sgd = SGD(filter(lambda p: p.requires_grad, lstm_crf.parameters()),
-              lr=1.0,
+    sgd = SGD(lstm_crf.get_trainable_params((1.0,)),
               cyclic=True,
               cycle_len=30)
 
-    lrs = [sgd.lr]
+    lrs = [sgd.lr[0]]
     for i in range(150):
         sgd.epoch_update(10)
-        lrs.append(sgd.lr)
+        lrs.append(sgd.lr[0])
 
     min_lr = min(lrs)
     max_lr = max(lrs)
@@ -44,16 +42,15 @@ def test_cyclic_decay(lstm_crf):
 
 def test_variable_length_cyclic_decay(lstm_crf):
     """Cyclic LR rate with cycle_mult set."""
-    sgd = SGD(filter(lambda p: p.requires_grad, lstm_crf.parameters()),
-              lr=1.0,
+    sgd = SGD(lstm_crf.get_trainable_params((1.0,)),
               cyclic=True,
               cycle_len=30,
               cycle_mult=2)
 
-    lrs = [sgd.lr]
+    lrs = [sgd.lr[0]]
     for i in range(210):
         sgd.epoch_update(10)
-        lrs.append(sgd.lr)
+        lrs.append(sgd.lr[0])
 
     assert max(lrs) == 1.0
 
@@ -69,18 +66,18 @@ def test_variable_length_cyclic_decay(lstm_crf):
     assert lrs[90] == 1.0
     assert lrs[209] == 0.00017133751222137006
 
+
 def test_variable_length_cyclic_decay_non_int_multiplier(lstm_crf):
     """Now try with a non-int multiplier."""
-    sgd = SGD(filter(lambda p: p.requires_grad, lstm_crf.parameters()),
-              lr=1.0,
+    sgd = SGD(lstm_crf.get_trainable_params((1.0,)),
               cyclic=True,
               cycle_len=30,
               cycle_mult=1.5)
 
-    lrs = [sgd.lr]
+    lrs = [sgd.lr[0]]
     for i in range(100):
         sgd.epoch_update(10)
-        lrs.append(sgd.lr)
+        lrs.append(sgd.lr[0])
 
     assert max(lrs) == 1.0
 

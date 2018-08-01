@@ -1,10 +1,9 @@
 test = ./test/
 logdir = ./training/logs/
 
-S3_LOGDIR       = s3://structurely-ml-logs/pycrf/
-TB_PORT         = 6006
-PYTHON_VERSION := `grep "python:" Dockerfile | head -1 | sed -r 's/.*([0-9]\.[0-9]).*/\1/g'`
-IMAGE_TAG      := python$(PYTHON_VERSION)
+S3_LOGDIR = s3://structurely-ml-logs/pycrf/
+TB_PORT   = 6006
+REPO      = epwalsh/pytorch-crf
 
 
 .PHONY : help
@@ -58,6 +57,14 @@ tensorboard :
 	@S3_REGION=us-west-2 TF_CPP_MIN_LOG_LEVEL=2 tensorboard \
 		--logdir=$(logdir) \
 		--port=$(TB_PORT)
+
+.PHONY : docker-build
+docker-build :
+	docker build -t $(REPO) .
+
+.PHONY : docker-test
+docker-test :
+	docker run --rm -it $(REPO)
 
 .PHONY : clean
 clean :

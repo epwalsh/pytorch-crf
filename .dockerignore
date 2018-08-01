@@ -1,0 +1,34 @@
+# Environment files.
+env.*.txt
+*access.txt
+
+# Python junk.
+**/*.pyc
+**/*.pyo
+**/*.so
+**/.ipynb_checkpoints
+**/.cache
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+.coverage
+
+# Mac OS X stuff.
+**/.DS_Store
+**/.Spotlight-V100
+**/.Trashes
+**/ehthumbs.db
+**/Thumbs.db
+
+# Vim swap files.
+**/*.swo
+**/*.swp
+**/*~
+
+# Other.
+**/scratch*
+LICENSE
+**/*.md
+
+# Models and pretrained stuff.
+training/*

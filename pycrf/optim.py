@@ -3,31 +3,55 @@
 from abc import ABC, abstractstaticmethod, abstractclassmethod
 import argparse
 import sys
-from typing import Iterable, Dict, Type, Union
+from typing import Dict, Type, Union, Tuple, List
 from warnings import warn
 
 import torch
 import numpy as np
 
 
-class CLOptim(ABC):
+class CLOptim(ABC, torch.optim.Optimizer):
     """Command line optimizer interface."""
+
+    @property
+    def lr(self):
+        """Get the learning rate."""
+        return tuple(x["lr"] for x in self.param_groups)
+
+    @lr.setter
+    def lr(self, values: Tuple[float]) -> None:
+        """Set the learning rate."""
+        for param_group, value in zip(self.param_groups, values):
+            param_group["lr"] = value
 
     @staticmethod
     @abstractstaticmethod
     def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
         """Add command line options specific to this optimizer."""
-        pass
+        raise NotImplementedError()
 
     @classmethod
     @abstractclassmethod
-    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+    def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize optimizer from command line options."""
-        pass
+        raise NotImplementedError()
 
     def epoch_update(self, loss: float) -> None:
         """Do any updating (such as lr update) after each epoch."""
         pass
+
+    @staticmethod
+    def update_param_groups(params: List[dict],
+                            opts: argparse.Namespace) -> None:
+        """Add learning rate to param groups."""
+        lrs: Union[Tuple[float], Tuple[float, float]]
+        if len(params) > 1:
+            lrs = (opts.lr_word_emb if opts.lr_word_emb else opts.lr, opts.lr)
+        else:
+            lrs = (opts.lr,)
+
+        for param_group, lr in zip(params, lrs):
+            param_group["lr"] = lr
 
 
 class AdaGrad(torch.optim.Adagrad, CLOptim):
@@ -44,6 +68,12 @@ class AdaGrad(torch.optim.Adagrad, CLOptim):
             help="""Learning rate. Default is 0.01."""
         )
         group.add_argument(
+            "--lr-word-emb",
+            type=float,
+            help="""Learning rate for word embeddings, only. A sensible value
+            would be 3-10x smaller than the default learning rate."""
+        )
+        group.add_argument(
             "--weight-decay",
             type=float,
             default=0.,
@@ -57,10 +87,10 @@ class AdaGrad(torch.optim.Adagrad, CLOptim):
         )
 
     @classmethod
-    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+    def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize this optimizer from the command line."""
+        cls.update_param_groups(params, opts)
         return cls(params,
-                   lr=opts.lr,
                    lr_decay=opts.lr_decay,
                    weight_decay=opts.weight_decay)
 
@@ -77,6 +107,12 @@ class AdaDelta(torch.optim.Adadelta, CLOptim):
             type=float,
             default=1.,
             help="""Learning rate. Default is 1.0."""
+        )
+        group.add_argument(
+            "--lr-word-emb",
+            type=float,
+            help="""Learning rate for word embeddings, only. A sensible value
+            would be 3-10x smaller than the default learning rate."""
         )
         group.add_argument(
             "--eps",
@@ -100,10 +136,10 @@ class AdaDelta(torch.optim.Adadelta, CLOptim):
         )
 
     @classmethod
-    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+    def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize this optimizer from the command line."""
+        cls.update_param_groups(params, opts)
         return cls(params,
-                   lr=opts.lr,
                    eps=opts.eps,
                    rho=opts.rho,
                    weight_decay=opts.weight_decay)
@@ -121,6 +157,12 @@ class RMSProp(torch.optim.RMSprop, CLOptim):
             type=float,
             default=0.01,
             help="""Learning rate. Default is 0.01."""
+        )
+        group.add_argument(
+            "--lr-word-emb",
+            type=float,
+            help="""Learning rate for word embeddings, only. A sensible value
+            would be 3-10x smaller than the default learning rate."""
         )
         group.add_argument(
             "--alpha",
@@ -155,10 +197,10 @@ class RMSProp(torch.optim.RMSprop, CLOptim):
         )
 
     @classmethod
-    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+    def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize this optimizer from the command line."""
+        cls.update_param_groups(params, opts)
         return cls(params,
-                   lr=opts.lr,
                    alpha=opts.alpha,
                    eps=opts.eps,
                    centered=opts.centered,
@@ -178,6 +220,12 @@ class Adam(torch.optim.Adam, CLOptim):
             type=float,
             default=0.001,
             help="""Learning rate. Default is 0.001."""
+        )
+        group.add_argument(
+            "--lr-word-emb",
+            type=float,
+            help="""Learning rate for word embeddings, only. A sensible value
+            would be 3-10x smaller than the default learning rate."""
         )
         group.add_argument(
             "--beta1",
@@ -213,10 +261,10 @@ class Adam(torch.optim.Adam, CLOptim):
         )
 
     @classmethod
-    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+    def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize Adam optimizer from command line options."""
+        cls.update_param_groups(params, opts)
         return cls(params,
-                   lr=opts.lr,
                    betas=(opts.beta1, opts.beta2),
                    eps=opts.eps,
                    amsgrad=opts.amsgrad,
@@ -235,6 +283,12 @@ class SparseAdam(torch.optim.SparseAdam, CLOptim):
             type=float,
             default=0.001,
             help="""Learning rate. Default is 0.001."""
+        )
+        group.add_argument(
+            "--lr-word-emb",
+            type=float,
+            help="""Learning rate for word embeddings, only. A sensible value
+            would be 3-10x smaller than the default learning rate."""
         )
         group.add_argument(
             "--beta1",
@@ -259,10 +313,10 @@ class SparseAdam(torch.optim.SparseAdam, CLOptim):
         )
 
     @classmethod
-    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+    def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize Adam optimizer from command line options."""
+        cls.update_param_groups(params, opts)
         return cls(params,
-                   lr=opts.lr,
                    betas=(opts.beta1, opts.beta2),
                    eps=opts.eps)
 
@@ -271,19 +325,18 @@ class SGD(torch.optim.SGD, CLOptim):
     """Wraps torch stochastic gradient descent optimizer."""
 
     def __init__(self,
-                 params: Iterable,
+                 params: List[dict],
                  decay_rate: float = 0.,
                  decay_start: int = 0,
                  conditional_decay: bool = False,
                  cyclic: bool = False,
                  cycle_len: int = 10,
                  cycle_mult: int = None,
-                 lr: float = None,
                  **kwargs) -> None:
         self.decay_rate = decay_rate
         self.decay_start = decay_start
         self.conditional_decay = conditional_decay
-        self.initial_lr: float = lr
+        self.initial_lr = tuple(x["lr"] for x in params)
         self.epoch: int = 0
         self.last_loss: Union[None, float] = None
         self.cyclic = cyclic
@@ -292,19 +345,7 @@ class SGD(torch.optim.SGD, CLOptim):
         self._cycle_fact: float = 1.
         self._cycle_counter: int = 1
 
-        kwargs["lr"] = lr
         super(SGD, self).__init__(params, **kwargs)
-
-    @property
-    def lr(self):
-        """Get the learning rate."""
-        return self.param_groups[0]["lr"]
-
-    @lr.setter
-    def lr(self, value: float) -> None:
-        """Set the learning rate."""
-        for param_group in self.param_groups:
-            param_group["lr"] = value
 
     @staticmethod
     def cl_opts(parser: argparse.ArgumentParser, require=True) -> None:
@@ -314,7 +355,13 @@ class SGD(torch.optim.SGD, CLOptim):
             "--lr",
             type=float,
             default=0.01,
-            help="""Learning rate"""
+            help="""Learning rate. Default is 0.01."""
+        )
+        group.add_argument(
+            "--lr-word-emb",
+            type=float,
+            help="""Learning rate for word embeddings, only. A sensible value
+            would be 3-10x smaller than the default learning rate."""
         )
         group.add_argument(
             "--momentum",
@@ -364,10 +411,9 @@ class SGD(torch.optim.SGD, CLOptim):
             type=float,
             help="""Factor by which the cyclic annealing schedule is slowed."""
         )
-        return None
 
     @classmethod
-    def cl_init(cls, params: Iterable, opts: argparse.Namespace):
+    def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize SGD from command line options."""
         kwargs = {}
         if opts.cycle_len:
@@ -379,9 +425,11 @@ class SGD(torch.optim.SGD, CLOptim):
             warn("Unused option: '--cycle_mult'. If you want to use a cyclic learning "
                  "rate schedule, you must specify the option '--cycle_len' as well.")
             sys.stderr.flush()
+
+        cls.update_param_groups(params, opts)
+
         return cls(params,
                    decay_rate=opts.decay_rate,
-                   lr=opts.lr,
                    momentum=opts.momentum,
                    nesterov=opts.nesterov,
                    weight_decay=opts.weight_decay,
@@ -404,7 +452,7 @@ class SGD(torch.optim.SGD, CLOptim):
             # if `self.conditional_decay = True` and the loss has not decreased
             # from the previous round.
             if not self.conditional_decay or last_loss_less:
-                self.lr = self.initial_lr / (1 + self.decay_rate * self.epoch)
+                self.lr = tuple(x / (1 + self.decay_rate * self.epoch) for x in self.initial_lr)
                 print(f"Updating learning rate to {self.lr}", flush=True)
 
         # Update the latest loss.
@@ -424,8 +472,11 @@ class SGD(torch.optim.SGD, CLOptim):
             # Adjust the cycle length.
             self._cycle_fact *= self.cycle_mult
             self._cycle_counter = 0
-        self.lr = \
-            (self.initial_lr / 2) * \
+
+        # Update learning rates according to this monotonic function.
+        # See Eq. (2) in Huang et al. 2017.
+        new_lr = tuple([
+            (x / 2) * \
             (
                 np.cos(
                     np.pi * (
@@ -433,8 +484,12 @@ class SGD(torch.optim.SGD, CLOptim):
                     ) / updated_cycle_len
                 )
                 + 1
-            )
+            ) for x in self.initial_lr
+        ])
+        self.lr = new_lr
+
         self._cycle_counter += 1
+
         print(f"Updating learning rate to {self.lr}", flush=True)
 
     def epoch_update(self, loss: float) -> None:

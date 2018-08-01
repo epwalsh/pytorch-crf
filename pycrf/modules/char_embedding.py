@@ -1,7 +1,7 @@
 """Character embedding module."""
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.nn import Dropout, Embedding
 
 

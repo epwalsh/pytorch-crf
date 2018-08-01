@@ -7,12 +7,11 @@ import zipfile
 
 import pytest
 
-from allennlp.modules.conditional_random_field import ConditionalRandomField
 from pycrf.eval import ModelStats
 from pycrf.io.dataset import Dataset
 from pycrf.io.vocab import Vocab
 from pycrf.io.vectors import load_pretrained
-from pycrf.modules import CharLSTM, LSTMCRF, CharCNN
+from pycrf.modules import CharLSTM, LSTMCRF, CharCNN, ConditionalRandomField
 
 
 VECTOR_CACHE = "test/.vector_cache/glove.6B.100d.txt"

@@ -40,7 +40,7 @@ def save_checkpoint(model: torch.nn.Module,
                     epoch: int) -> None:
     """Save a training checkpoint."""
     checkpoint_path = _get_checkpoint_path(path, epoch)
-    print(f"Saving checkpoint to {checkpoint_path}")
+    print(f"Saving checkpoint to {checkpoint_path}", flush=True)
     torch.save({
         "epoch": epoch + 1,
         "state_dict": model.state_dict(),
@@ -63,9 +63,10 @@ def load_checkpoint(model: torch.nn.Module,
 def save_model(model: torch.nn.Module, path: str, epoch: int) -> None:
     """Save the model with best epoch weights."""
     model_path = f"{path}.pt"
-    print(f"Saving best model to {model_path}")
+    print(f"Saving best model to {model_path}", flush=True)
     load_checkpoint(model, path, epoch)
     torch.save(model, model_path)
+    print("Done!", flush=True)
 
 
 def train(opts: argparse.Namespace,
@@ -178,9 +179,8 @@ def train(opts: argparse.Namespace,
             logger.end_epoch()
 
             # Record additional metrics.
-            logger.record({
-                "lr": optimizer.lr,
-            }, epoch + 1)
+            metrics = {f"lr/group{i}": x for i, x in enumerate(optimizer.lr)}
+            logger.record(metrics, epoch + 1)
 
             # Update optimizer.
             optimizer.epoch_update(logger.epoch_loss)
@@ -304,7 +304,7 @@ def main(args: List[str] = None) -> None:
     print(model, flush=True)
 
     # Initialize the optimizer.
-    optimizer = optim_class.cl_init(filter(lambda p: p.requires_grad, model.parameters()), opts)
+    optimizer = optim_class.cl_init(model.get_trainable_params(), opts)
 
     # Train model.
     train(opts, model, optimizer, dataset_train, dataset_valid)

@@ -1,17 +1,13 @@
-FROM python:3.6
-
-# Install some base packages.
-RUN apt-get update && \
-    apt-get install \
-        build-essential && \
-    rm -rf /var/lib/apt/lists/*
+FROM epwalsh/machine-learning-base:latest
 
 # Set working dir.
 WORKDIR /opt/python/app
 
 # Install Python dependencies.
 COPY requirements.txt ./requirements.txt
-RUN pip3 install -r requirements.txt
+RUN pip install -r requirements.txt
 
 # Move application files into place.
-COPY pycrf ./pycrf/
+COPY . .
+
+ENTRYPOINT ["make", "test"]

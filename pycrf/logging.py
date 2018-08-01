@@ -127,6 +127,8 @@ class Logger:
 
     def end_train(self, validation: bool = False) -> int:
         """End round of training."""
+        if not self.eval_stats:
+            return 0
         if validation:
             best_epoch = max(self.eval_stats, key=lambda x: x.score)
         else:

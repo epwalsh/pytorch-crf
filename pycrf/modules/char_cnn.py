@@ -3,7 +3,7 @@
 import argparse
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.nn import Conv1d
 
 from pycrf.io import Vocab
