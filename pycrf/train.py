@@ -126,6 +126,13 @@ def train(opts: argparse.Namespace,
         try:
             logger.start_epoch(epoch)
 
+            # Record learning rate and other metrics.
+            metrics = {f"lr/group{i}": x for i, x in enumerate(optimizer.lr)}
+            logger.record(metrics, epoch + 1)
+
+            # Prepare optimizer for epoch.
+            optimizer.epoch_prepare(len(dataset_train), opts.batch_size)
+
             # Shuffle dataset.
             dataset_train.shuffle()
 
@@ -136,8 +143,8 @@ def train(opts: argparse.Namespace,
             # Loop through all mini-batches.
             # ==================================================================
 
-            iteration = 0
-            while iteration < len(dataset_train):
+            example_num = 0
+            while example_num < len(dataset_train):
                 # Zero out the gradient.
                 model.zero_grad()
 
@@ -146,15 +153,15 @@ def train(opts: argparse.Namespace,
                 # ==============================================================
 
                 batch_loss: torch.Tensor = 0.
-                for _ in range(min([opts.batch_size, n_examples - iteration])):
-                    src, tgt = dataset_train[iteration]
+                for _ in range(min([opts.batch_size, n_examples - example_num])):
+                    src, tgt = dataset_train[example_num]
 
                     # Compute the loss.
                     loss = model(*src, tgt)
                     batch_loss += loss
 
-                    logger.update(epoch, iteration, loss, model.named_parameters())
-                    iteration += 1
+                    logger.update(epoch, example_num, loss, model.named_parameters())
+                    example_num += 1
 
                 # ==============================================================
                 # End mini-batch.
@@ -171,16 +178,15 @@ def train(opts: argparse.Namespace,
                 # Take a step.
                 optimizer.step()
 
+                # Update the optimizer.
+                optimizer.iteration_update(example_num)
+
             # ==================================================================
             # End all mini-batches.
             # ==================================================================
 
             # Log the loss and duration of the epoch.
             logger.end_epoch()
-
-            # Record additional metrics.
-            metrics = {f"lr/group{i}": x for i, x in enumerate(optimizer.lr)}
-            logger.record(metrics, epoch + 1)
 
             # Update optimizer.
             optimizer.epoch_update(logger.epoch_loss)

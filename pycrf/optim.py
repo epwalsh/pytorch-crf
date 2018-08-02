@@ -36,8 +36,16 @@ class CLOptim(ABC, torch.optim.Optimizer):
         """Initialize optimizer from command line options."""
         raise NotImplementedError()
 
+    def iteration_update(self, i: int) -> None:
+        """Do any updating (such as lr update) after an iteration (mini-batch)."""
+        pass
+
     def epoch_update(self, loss: float) -> None:
         """Do any updating (such as lr update) after each epoch."""
+        pass
+
+    def epoch_prepare(self, training_size: int, batch_size: int) -> None:
+        """Prepare optimizer for an epoch of training."""
         pass
 
     @staticmethod
@@ -326,24 +334,17 @@ class SGD(torch.optim.SGD, CLOptim):
 
     def __init__(self,
                  params: List[dict],
-                 decay_rate: float = 0.,
-                 decay_start: int = 0,
-                 conditional_decay: bool = False,
-                 cyclic: bool = False,
-                 cycle_len: int = 10,
-                 cycle_mult: int = None,
+                 cycle_len: int = None,
+                 cycle_mult: float = 1.,
                  **kwargs) -> None:
-        self.decay_rate = decay_rate
-        self.decay_start = decay_start
-        self.conditional_decay = conditional_decay
         self.initial_lr = tuple(x["lr"] for x in params)
         self.epoch: int = 0
-        self.last_loss: Union[None, float] = None
-        self.cyclic = cyclic
-        self.cycle_len = cycle_len
+        self.cycle_len = self._updated_cycle_len = cycle_len
         self.cycle_mult = cycle_mult
         self._cycle_fact: float = 1.
-        self._cycle_counter: int = 1
+        self._cycle_counter: int = 0
+        self._training_size: int = None
+        self._batch_size: int = None
 
         super(SGD, self).__init__(params, **kwargs)
 
@@ -355,7 +356,9 @@ class SGD(torch.optim.SGD, CLOptim):
             "--lr",
             type=float,
             default=0.01,
-            help="""Learning rate. Default is 0.01."""
+            help="""Learning rate. Default is 0.01. To add cosine annealing (with
+            restarts) to the learning rate, use the cycle_len option as well.
+            If you don't want resets, set cycle_len to the number of epochs."""
         )
         group.add_argument(
             "--lr-word-emb",
@@ -376,29 +379,10 @@ class SGD(torch.optim.SGD, CLOptim):
             help="""Enable Nesterov momentum."""
         )
         group.add_argument(
-            "--decay-rate",
-            type=float,
-            default=0.,
-            help="""Learning rate decay factor. Default is 0, but a sensible
-            value might be 0.05."""
-        )
-        group.add_argument(
             "--weight-decay",
             type=float,
             default=0.,
             help="""L2 penalty. Default is 0."""
-        )
-        group.add_argument(
-            "--decay-start",
-            type=int,
-            default=0,
-            help="""Epoch to start decay at if loss doesn't decrease."""
-        )
-        group.add_argument(
-            "--conditional-decay",
-            action="store_true",
-            help="""If set, learning rate decay will only happen when the loss
-            does not decrease from the previous round."""
         )
         group.add_argument(
             "--cycle_len",
@@ -415,13 +399,7 @@ class SGD(torch.optim.SGD, CLOptim):
     @classmethod
     def cl_init(cls, params: List[dict], opts: argparse.Namespace):
         """Initialize SGD from command line options."""
-        kwargs = {}
-        if opts.cycle_len:
-            kwargs["cycle_len"] = opts.cycle_len
-            kwargs["cyclic"] = True
-            if opts.cycle_mult:
-                kwargs["cycle_mult"] = opts.cycle_mult
-        elif opts.cycle_mult:
+        if not opts.cycle_len and opts.cycle_mult:
             warn("Unused option: '--cycle_mult'. If you want to use a cyclic learning "
                  "rate schedule, you must specify the option '--cycle_len' as well.")
             sys.stderr.flush()
@@ -429,49 +407,24 @@ class SGD(torch.optim.SGD, CLOptim):
         cls.update_param_groups(params, opts)
 
         return cls(params,
-                   decay_rate=opts.decay_rate,
+                   cycle_len=opts.cycle_len,
+                   cycle_mult=opts.cycle_mult or 1.,
                    momentum=opts.momentum,
                    nesterov=opts.nesterov,
-                   weight_decay=opts.weight_decay,
-                   decay_start=opts.decay_start,
-                   conditional_decay=opts.conditional_decay,
-                   **kwargs)
+                   weight_decay=opts.weight_decay)
 
-    def _vanilla_decay(self, loss: float) -> None:
-        # pylint: disable=attribute-defined-outside-init
-        """
-        Perform 'vanilla' LR decay.
-
-        This just follows a simple annealing schedule in which the LR is decreased
-        by a factor at the end of each epoch.
-        """
-        # Check if we should decrease the learning rate.
-        if self.decay_rate > 0 and self.decay_start <= self.epoch:
-            last_loss_less: bool = self.last_loss is not None and self.last_loss <= loss
-            # Decrease the learning rate if `self.conditional_decay = False` or
-            # if `self.conditional_decay = True` and the loss has not decreased
-            # from the previous round.
-            if not self.conditional_decay or last_loss_less:
-                self.lr = tuple(x / (1 + self.decay_rate * self.epoch) for x in self.initial_lr)
-                print(f"Updating learning rate to {self.lr}", flush=True)
-
-        # Update the latest loss.
-        self.last_loss = loss
-
-    def _cyclic_decay(self) -> None:
+    def _cyclic_decay(self, i: int) -> None:
         # pylint: disable=attribute-defined-outside-init
         """
         Perform cyclic LR decay.
 
         See http://arxiv.org/abs/1704.00109.
         """
-        updated_cycle_len = int(self._cycle_fact * self.cycle_len)
-        if self.cycle_mult and \
-                self.epoch > 1 and \
-                (self._cycle_counter) % updated_cycle_len == 0:
-            # Adjust the cycle length.
-            self._cycle_fact *= self.cycle_mult
-            self._cycle_counter = 0
+        offset: float
+        if self._training_size:
+            offset = i / self._training_size
+        else:
+            offset = 0.
 
         # Update learning rates according to this monotonic function.
         # See Eq. (2) in Huang et al. 2017.
@@ -479,28 +432,42 @@ class SGD(torch.optim.SGD, CLOptim):
             (x / 2) * \
             (
                 np.cos(
-                    np.pi * (
-                        (self._cycle_counter) % updated_cycle_len
-                    ) / updated_cycle_len
+                    np.pi *
+                    ((self._cycle_counter + offset) % self._updated_cycle_len) /
+                    self._updated_cycle_len
                 )
-                + 1
+                + 1.
             ) for x in self.initial_lr
         ])
         self.lr = new_lr
 
-        self._cycle_counter += 1
-
-        print(f"Updating learning rate to {self.lr}", flush=True)
+    def iteration_update(self, i: int) -> None:
+        """Update learning rate according to cyclic schedule."""
+        if self.cycle_len:
+            self._cyclic_decay(i)
 
     def epoch_update(self, loss: float) -> None:
         # pylint: disable=invalid-name,attribute-defined-outside-init
         """Update the learning rate."""
         self.epoch += 1
+        if not self.cycle_len:
+            return None
 
-        if not self.cyclic:
-            self._vanilla_decay(loss)
-        else:
-            self._cyclic_decay()
+        self._cycle_counter += 1
+
+        if self._cycle_counter % self._updated_cycle_len == 0:
+            # Adjust the cycle length.
+            self._cycle_fact *= self.cycle_mult
+            self._cycle_counter = 0
+            self._updated_cycle_len = int(self._cycle_fact * self.cycle_len)
+
+        print(f"Learning rate set to {self.lr}", flush=True)
+        return None
+
+    def epoch_prepare(self, training_size: int, batch_size: int) -> None:
+        """Update training set size and batch size."""
+        self._training_size = training_size
+        self._batch_size = batch_size
 
 
 OPTIM_ALIASES: Dict[str, Type[CLOptim]] = {
