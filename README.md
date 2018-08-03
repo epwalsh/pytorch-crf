@@ -8,7 +8,7 @@ A [PyTorch](https://pytorch.org/) implementation of a Bi-LSTM CRF with character
 
 ## Requirements
 
-First and foremost, you will need Python 3.6. The remaining requirements are listed in `requirements.txt` and can be installed with `pip install -r requirements.txt`.
+First and foremost, you will need Python >= 3.6. The remaining requirements are listed in `requirements.txt` and can be installed with `pip install -r requirements.txt`.
 
 ## Quick start
 

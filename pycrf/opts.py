@@ -5,6 +5,7 @@ from typing import Type, Dict
 
 import torch
 
+from .exceptions import ArgParsingError
 from .modules import CharLSTM, CharCNN
 from .optim import OPTIM_ALIASES
 
@@ -83,6 +84,7 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
     group.add_argument(
         "--word-vectors",
         type=str,
+        required=require,
         help="""Path to pretrained word vectors."""
     )
     group.add_argument(
@@ -173,9 +175,17 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
     )
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    """Override error method of ArgumentParser."""
+
+    def error(self, message):
+        """Handle improper command-line arguments."""
+        raise ArgParsingError(message)
+
+
 def get_parser(args, options):
     """Get parser and initial options."""
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = ArgumentParser(add_help=False)
     help_opts(parser)
 
     # Parse initial option to check for 'help' flag.
@@ -194,7 +204,7 @@ def parse_all(args, initial_opts, parser):
     # Check if we should display the help message and exit.
     if initial_opts.help:
         parser.print_help()
-        return None
+        raise ArgParsingError
 
     # Parse the args again.
     opts = parser.parse_args(args=args)

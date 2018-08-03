@@ -3,7 +3,7 @@
 from abc import ABC, abstractstaticmethod, abstractclassmethod
 import argparse
 import sys
-from typing import Dict, Type, Union, Tuple, List
+from typing import Dict, Type, Tuple, List
 from warnings import warn
 
 import torch
@@ -52,7 +52,7 @@ class CLOptim(ABC, torch.optim.Optimizer):
     def update_param_groups(params: List[dict],
                             opts: argparse.Namespace) -> None:
         """Add learning rate to param groups."""
-        lrs: Union[Tuple[float], Tuple[float, float]]
+        lrs: Tuple[float, ...]
         if len(params) > 1:
             lrs = (opts.lr_word_emb if opts.lr_word_emb else opts.lr, opts.lr)
         else:

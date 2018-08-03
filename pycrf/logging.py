@@ -2,17 +2,26 @@
 
 import time
 import datetime
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import numpy as np
 import torch
 import tensorflow as tf
+from tqdm import tqdm, tqdm_notebook
 
 from .eval import ModelStats
 
 
 def _format_duration(seconds):
     return str(datetime.timedelta(seconds=int(seconds)))
+
+
+def in_ipynb():
+    """Check whether in iPython notebook or not."""
+    try:
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
+    except NameError:
+        return False
 
 
 class Logger:
@@ -47,17 +56,17 @@ class Logger:
         self.verbose = verbose
         self.results_file = results_file
         self.log_weights = log_weights
+        self.pbar: tqdm = None
 
         self.eval_stats: List[ModelStats] = []
 
         self.train_start_time: float = time.time()
-        self.epoch_start_time: float
-        self.running_time: float
-        self.epoch_duration: float
         self.time_to_epoch: float
 
         self.epoch_loss = 0.
         self.running_loss = 0.
+
+        self._last_update_iteration = 1
 
         if log_dir is not None:
             self.writer = tf.summary.FileWriter(log_dir)
@@ -111,19 +120,26 @@ class Logger:
 
     def start_epoch(self, epoch: int) -> None:
         """Log start of epoch."""
-        print(f"\nEpoch {epoch+1:d}")
-        print("==================================================", flush=True)
         self.epoch_loss = 0.
         self.running_loss = 0.
-        self.epoch_start_time = self.running_time = time.time()
+        if in_ipynb():
+            self.pbar = tqdm_notebook(total=self.n_examples,
+                                      desc=f"{epoch+1:d}",
+                                      leave=True)
+        else:
+            self.pbar = tqdm(total=self.n_examples,
+                             desc=f"{epoch+1:d}",
+                             leave=True)
+        self._last_update_iteration = 1
 
     def end_epoch(self) -> None:
         """Log end of epoch."""
         now = time.time()
-        self.epoch_duration = now - self.epoch_start_time
         self.time_to_epoch = now - self.train_start_time
-        print(f"Loss: {self.epoch_loss:f}, duration: {self.epoch_duration:.0f} seconds", flush=True)
-        print(f"Total time: {_format_duration(self.time_to_epoch):s}")
+        if self.pbar:
+            self.pbar.update(self.n_examples - self.pbar.n)
+            self.pbar.set_postfix({"loss": f"{self.epoch_loss:.2f}"})
+            self.pbar.close()
 
     def end_train(self, validation: bool = False) -> int:
         """End round of training."""
@@ -184,25 +200,24 @@ class Logger:
                epoch: int,
                iteration: int,
                loss: torch.Tensor,
-               params: dict):
+               params: dict,
+               lrs: Tuple[float, ...]):
         """Update loss."""
         self.epoch_loss += loss.item()
         self.running_loss += loss.item()
 
-        if self.verbose and (iteration + 1) % self.log_interval == 0:
-            progress = 100 * (iteration + 1) / self.n_examples
-            duration = time.time() - self.running_time
-            print("[{:6.2f}%] loss: {:10.5f}, duration: {:.2f} seconds"
-                  .format(progress, self.running_loss, duration), flush=True)
-
-            if self.writer is not None:
-                step = epoch * self.n_examples + iteration + 1
-                if self.log_weights:
-                    for tag, value in params:
-                        if not value.requires_grad:
-                            continue
-                        tag = tag.replace(".", "/")
-                        self.histo_summary(tag, value.data.cpu().numpy(), step)
-
+        if (iteration + 1) % self.log_interval == 0:
+            self.pbar.update(iteration - self._last_update_iteration)
+            postfix = {"loss": f"{self.epoch_loss:.4g} ({self.running_loss:.4g})",
+                       "lr": f"{max(lrs):.4g}"}
+            self.pbar.set_postfix(postfix)
+            self._last_update_iteration = iteration
             self.running_loss = 0.
-            self.running_time = time.time()
+
+            if self.writer is not None and self.log_weights:
+                step = epoch * self.n_examples + iteration + 1
+                for tag, value in params:
+                    if not value.requires_grad:
+                        continue
+                    tag = tag.replace(".", "/")
+                    self.histo_summary(tag, value.data.cpu().numpy(), step)

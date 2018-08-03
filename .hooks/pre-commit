@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+MASTER='refs/heads/master'
+
+if git symbolic-ref HEAD | grep $MASTER >/dev/null; then
+    exec < /dev/tty
+    while true; do
+        read -p "You're about to commit to master, are you sure? [y|n]" yn
+        case $yn in
+            [Yy]* ) exit 0;; # tells git to continue normally
+            [Nn]* ) exit 1;; # tells git to abort operation
+        esac
+    done
+fi
+
+jupyter_nbs=$(git diff --cached --name-status | awk '$1 != "D" { print $2 }' | grep .ipynb | wc -l)
+
+if [ $jupyter_nbs -gt 0 ]; then
+    exec < /dev/tty
+    while true; do
+        read -p "You're about to commit a jupyter notebook, did you remove all output first? [y|n]" yn
+        case $yn in
+            [Yy]* ) exit 0;; # tells git to continue normally
+            [Nn]* ) exit 1;; # tells git to abort operation
+        esac
+    done
+fi
+
+exit 0 # everything is ok

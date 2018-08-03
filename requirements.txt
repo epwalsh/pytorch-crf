@@ -1,6 +1,7 @@
 # Core requirements.
 torch>=0.4.0
 numpy
+tqdm
 
 # Only needed for testing.
 pytest
