@@ -10,21 +10,14 @@ import tensorflow as tf
 from tqdm import tqdm, tqdm_notebook
 
 from .eval import ModelStats
+from .utils import in_ipynb
 
 
 def _format_duration(seconds):
     return str(datetime.timedelta(seconds=int(seconds)))
 
 
-def in_ipynb():
-    """Check whether in iPython notebook or not."""
-    try:
-        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
-    except NameError:
-        return False
-
-
-class Logger:
+class TrainLogger:
     """
     Logs progress during training.
 
@@ -66,7 +59,7 @@ class Logger:
         self.epoch_loss = 0.
         self.running_loss = 0.
 
-        self._last_update_iteration = 1
+        self._last_update_iteration = 0
 
         if log_dir is not None:
             self.writer = tf.summary.FileWriter(log_dir)
@@ -130,7 +123,7 @@ class Logger:
             self.pbar = tqdm(total=self.n_examples,
                              desc=f"{epoch+1:d}",
                              leave=True)
-        self._last_update_iteration = 1
+        self._last_update_iteration = -1
 
     def end_epoch(self) -> None:
         """Log end of epoch."""
@@ -140,9 +133,15 @@ class Logger:
             self.pbar.update(self.n_examples - self.pbar.n)
             self.pbar.set_postfix({"loss": f"{self.epoch_loss:.2f}"})
             self.pbar.close()
+            self.pbar = None
 
     def end_train(self, validation: bool = False) -> int:
         """End round of training."""
+        # Close progress bar in case training was stopped early.
+        if self.pbar:
+            self.pbar.close()
+            self.pbar = None
+
         if not self.eval_stats:
             return 0
         if validation:
@@ -221,3 +220,34 @@ class Logger:
                         continue
                     tag = tag.replace(".", "/")
                     self.histo_summary(tag, value.data.cpu().numpy(), step)
+
+
+class LRFinderLogger:
+    # pylint: disable=too-few-public-methods
+    """
+    Logs progress during learning rate search.
+
+    Parameters
+    ----------
+    n : int
+        The size of the search space.
+
+    """
+
+    def __init__(self, n: int) -> None:
+        self.n = n
+        if in_ipynb():
+            self.pbar = tqdm_notebook(total=self.n, leave=True)
+        else:
+            self.pbar = tqdm(total=self.n, leave=True)
+
+    def __del__(self):
+        self.pbar.close()
+
+    def update(self, lr: float, loss: float) -> None:
+        """Update progress."""
+        self.pbar.update(1)
+        self.pbar.set_postfix({
+            "lr": lr,
+            "loss": loss,
+        })

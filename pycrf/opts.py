@@ -84,7 +84,6 @@ def train_opts(parser: argparse.ArgumentParser, require: bool = True) -> None:
     group.add_argument(
         "--word-vectors",
         type=str,
-        required=require,
         help="""Path to pretrained word vectors."""
     )
     group.add_argument(

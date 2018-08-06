@@ -10,3 +10,11 @@ def _parse_data_path(path: str) -> Tuple[Union[str, None], str]:
     if len(separated) == 2:
         return separated[0], separated[1]
     raise ValueError("Invalid path; extra ':' found.")
+
+
+def in_ipynb() -> bool:
+    """Check whether in iPython notebook or not."""
+    try:
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore
+    except NameError:
+        return False

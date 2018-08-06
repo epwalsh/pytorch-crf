@@ -18,17 +18,18 @@ feature model or optimizer with:
 """
 
 import sys
-from typing import List
+from typing import List, Tuple, Generator
 
 import torch
+import numpy as np
 
 from .eval import ModelStats
 from .exceptions import LearnerInitializationError, ArgParsingError
 from .io import Vocab, Dataset
 from .io.vectors import load_pretrained
-from .logging import Logger
+from .logging import TrainLogger, LRFinderLogger
 from .modules import LSTMCRF
-from .optim import OPTIM_ALIASES
+from .optim import CLOptim, OPTIM_ALIASES, SGD
 from .opts import train_opts, MODEL_ALIASES, get_parser, parse_all, get_device
 from .utils import _parse_data_path
 
@@ -91,9 +92,15 @@ class Learner:
 
         # Ensure we were given a path to a training object or training text files
         # and pretrained word vectors text file.
-        if not opts.train_object and not opts.train:
-            err_msg = f"the following arguments are required: --train (or --train-object)"
-            raise ArgParsingError(err_msg)
+        if not opts.train_object:
+            missing = []
+            if not opts.train:
+                missing.append("--train (or --train-object)")
+            if not opts.word_vectors:
+                missing.append("--word-vectors")
+            if missing:
+                err_msg = f"the following arguments are required: {', '.join(missing)}"
+                raise ArgParsingError(err_msg)
 
         # Get the device to train on.
         device = get_device(opts)
@@ -141,10 +148,22 @@ class Learner:
         print(model, flush=True)
 
         self._opts = opts
+        self.vocab = vocab
+        self.pretrained_word_vecs = pretrained_vecs
         self.model = model
         self.optimizer_class = optim_class
         self.dataset_train = dataset_train
         self.dataset_valid = dataset_valid
+
+    def save_train_state(self, path: str) -> None:
+        """Save training set state object."""
+        train_object = {
+            "vocab": self.vocab,
+            "word_vectors": self.pretrained_word_vecs,
+            "train": self.dataset_train,
+            "validation": self.dataset_valid,
+        }
+        torch.save(train_object, path)
 
     @classmethod
     def build(cls, **options):
@@ -176,18 +195,74 @@ class Learner:
         else:
             self._opts.__dict__[name] = value
 
+    def fit_epoch(self,
+                  optimizer: CLOptim,
+                  dataset: Dataset,
+                  epoch: int = 0,
+                  logger: TrainLogger = None,
+                  n: int = None) -> Generator[float, None, None]:
+        """Train for one epoch."""
+        # Prepare optimizer for epoch.
+        optimizer.epoch_prepare(len(dataset), self._opts.batch_size)
+
+        # Set model to train mode.
+        self.model.train()
+
+        # ==================================================================
+        # Loop through all mini-batches.
+        # ==================================================================
+
+        n_examples = n or len(dataset)
+        example_num = 0
+        while example_num < n_examples:
+            # Zero out the gradient.
+            self.model.zero_grad()
+
+            # ==============================================================
+            # Loop through sentences in mini-batch.
+            # ==============================================================
+
+            batch_loss: torch.Tensor = 0.
+            for _ in range(min([self._opts.batch_size, n_examples - example_num])):
+                src, tgt = dataset[example_num]
+
+                # Compute the loss.
+                loss = self.model(*src, tgt)
+                batch_loss += loss
+
+                if logger:
+                    logger.update(epoch, example_num, loss,
+                                  self.model.named_parameters(),
+                                  optimizer.lr)
+                example_num += 1
+
+            # Compute the gradient.
+            batch_loss.backward()
+
+            # Clip gradients.
+            if self._opts.max_grad is not None:
+                torch.nn.utils.clip_grad_value_(
+                    self.model.parameters(), self._opts.max_grad)
+
+            # Take a step.
+            optimizer.step()
+
+            # Update the optimizer.
+            optimizer.iteration_update(example_num)
+
+            yield batch_loss.item()
+
     def fit(self) -> None:
         """Train model."""
         # Initialize the optimizer.
         optimizer = self.optimizer_class.cl_init(self.model.get_trainable_params(), self._opts)
 
         # Initialize logger.
-        n_examples = len(self.dataset_train)
-        logger = Logger(n_examples,
-                        log_interval=self._opts.log_interval,
-                        verbose=self._opts.verbose,
-                        results_file=self._opts.results,
-                        log_dir=self._opts.log_dir)
+        logger = TrainLogger(len(self.dataset_train),
+                             log_interval=self._opts.log_interval,
+                             verbose=self._opts.verbose,
+                             results_file=self._opts.results,
+                             log_dir=self._opts.log_dir)
 
         # Load checkpoint if given.
         if self._opts.checkpoint:
@@ -211,61 +286,12 @@ class Learner:
                 metrics = {f"lr/group{i}": x for i, x in enumerate(optimizer.lr)}
                 logger.record(metrics, epoch + 1)
 
-                # Prepare optimizer for epoch.
-                optimizer.epoch_prepare(len(self.dataset_train), self._opts.batch_size)
-
                 # Shuffle dataset.
                 self.dataset_train.shuffle()
 
-                # Set model to train mode.
-                self.model.train()
-
-                # ==================================================================
-                # Loop through all mini-batches.
-                # ==================================================================
-
-                example_num = 0
-                while example_num < len(self.dataset_train):
-                    # Zero out the gradient.
-                    self.model.zero_grad()
-
-                    # ==============================================================
-                    # Loop through sentences in mini-batch.
-                    # ==============================================================
-
-                    batch_loss: torch.Tensor = 0.
-                    for _ in range(min([self._opts.batch_size, n_examples - example_num])):
-                        src, tgt = self.dataset_train[example_num]
-
-                        # Compute the loss.
-                        loss = self.model(*src, tgt)
-                        batch_loss += loss
-
-                        logger.update(epoch, example_num, loss, self.model.named_parameters(),
-                                      optimizer.lr)
-                        example_num += 1
-
-                    # ==============================================================
-                    # End mini-batch.
-                    # ==============================================================
-
-                    # Compute the gradient.
-                    batch_loss.backward()
-
-                    # Clip gradients.
-                    if self._opts.max_grad is not None:
-                        torch.nn.utils.clip_grad_value_(
-                            self.model.parameters(), self._opts.max_grad)
-
-                    # Take a step.
-                    optimizer.step()
-
-                    # Update the optimizer.
-                    optimizer.iteration_update(example_num)
-
-                # ==================================================================
-                # End all mini-batches.
-                # ==================================================================
+                # Fit to training set for one epoch.
+                for _ in self.fit_epoch(optimizer, self.dataset_train, logger=logger, epoch=epoch):
+                    pass
 
                 # Log the loss and duration of the epoch.
                 logger.end_epoch()
@@ -306,6 +332,66 @@ class Learner:
         # Save best model.
         if self._opts.out:
             save_model(self.model, self._opts.out, best_epoch)
+
+    def find_lr(self,
+                bounds: Tuple[float, float] = (1e-5, 1.),
+                iterations: int = 100,
+                smoothing: float = 0.) -> Tuple[np.array, np.array]:
+        """
+        Find best learning rate.
+
+        Parameters
+        ----------
+        bounds : Tuple[float, float]
+            The minimum and maximum learning to try.
+
+        Returns
+        -------
+        Tuple[np.array, np.array]
+            An array of learnings rates and an array of corresponding values
+            of the loss on the validation set.
+
+        """
+        assert iterations * self._opts.batch_size <= len(self.dataset_train)
+        assert smoothing < 1.
+
+        # Construst sequence of learning rates to test.
+        min_lr, max_lr = bounds
+        start_seq = np.log(min_lr)
+        stop_seq = np.log(max_lr)
+        lrs = np.exp(np.arange(start_seq, stop_seq, step=0.1))
+
+        logger = LRFinderLogger(len(lrs))
+
+        # Only going to fit the last layer for tuning the lr.
+        params = self.model.get_trainable_params()[-1:]
+
+        losses: List[float] = []
+        for lr in lrs:
+            params[0]["lr"] = lr
+            optimizer = SGD(params)
+
+            # Shuffle dataset.
+            self.dataset_train.shuffle()
+
+            # Fit for specifiec number of iterations.
+            loss: float = 0.
+            for batch_loss in self.fit_epoch(optimizer, self.dataset_train,
+                                             n=(iterations * self._opts.batch_size)):
+                loss += batch_loss
+
+            # Evaluate validation set.
+            losses.append(loss)
+
+            # Log progress.
+            logger.update(lr, loss)
+
+        # Apply exponential smoothing.
+        if smoothing:
+            for i in range(1, len(losses)):
+                losses[i] = (1 - smoothing) * losses[i] + smoothing * losses[i-1]
+
+        return lrs, np.array(losses)
 
 
 def main(args: List[str] = None) -> None:
