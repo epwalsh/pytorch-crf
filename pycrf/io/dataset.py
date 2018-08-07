@@ -34,10 +34,20 @@ class Dataset(Sized, Iterable):
     def __bool__(self) -> bool:
         return len(self.source) > 0
 
-    def append(self, src: SourceType, tgt: TargetType) -> None:
+    def append(self,
+               src: List[str],
+               tgt: List[str],
+               vocab: Vocab,
+               device: torch.device = None,
+               sent_context: str = None) -> None:
         """Append a new training example."""
-        self.source.append(src)
-        self.target.append(tgt)
+        src_tensor = vocab.sent2tensor(src, device=device,
+                                       sent_context=sent_context,
+                                       test=self.is_test)
+        tgt_tensor = vocab.labs2tensor(tgt, device=device,
+                                       test=self.is_test)
+        self.source.append(src_tensor)
+        self.target.append(tgt_tensor)
 
     def shuffle(self) -> None:
         """Shuffle source and targets together."""

@@ -16,7 +16,7 @@ class LearnerInitializationError(Error):
     def __init__(self,
                  missing_args: List[str] = None,
                  unknown_args: List[str] = None) -> None:
-        message: str = None
+        message: str
         self.missing_args = missing_args
         self.unknown_args = unknown_args
         if unknown_args:
@@ -25,6 +25,8 @@ class LearnerInitializationError(Error):
         elif missing_args:
             message = f"missing required keyword argument: "\
                 f"{', '.join([x.replace('-', '_') for x in missing_args])}"
+        else:
+            message = ""
         super(LearnerInitializationError, self).__init__(message)
 
 

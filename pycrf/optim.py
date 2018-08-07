@@ -343,8 +343,8 @@ class SGD(torch.optim.SGD, CLOptim):
         self.cycle_mult = cycle_mult
         self._cycle_fact: float = 1.
         self._cycle_counter: int = 0
-        self._training_size: int = None
-        self._batch_size: int = None
+        self._training_size: int = 0
+        self._batch_size: int = 0
 
         super(SGD, self).__init__(params, **kwargs)
 
@@ -433,7 +433,7 @@ class SGD(torch.optim.SGD, CLOptim):
             (
                 np.cos(
                     np.pi *
-                    ((self._cycle_counter + offset) % self._updated_cycle_len) /
+                    ((self._cycle_counter + offset) % self._updated_cycle_len) /  # type: ignore
                     self._updated_cycle_len
                 )
                 + 1.
@@ -455,7 +455,7 @@ class SGD(torch.optim.SGD, CLOptim):
 
         self._cycle_counter += 1
 
-        if self._cycle_counter % self._updated_cycle_len == 0:
+        if self._cycle_counter % self._updated_cycle_len == 0:  # type: ignore
             # Adjust the cycle length.
             self._cycle_fact *= self.cycle_mult
             self._cycle_counter = 0
