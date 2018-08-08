@@ -231,7 +231,8 @@ class Learner:
             # ==============================================================
 
             batch_loss: torch.Tensor = 0.
-            for _ in range(min([self._opts.batch_size, n_examples - example_num])):
+            example_count: int = min([self._opts.batch_size, n_examples - example_num])
+            for _ in range(example_count):
                 src, tgt = dataset[example_num]
 
                 # Compute the loss.
@@ -258,7 +259,7 @@ class Learner:
             # Update the optimizer.
             optimizer.iteration_update(example_num)
 
-            yield batch_loss.item()
+            yield batch_loss.item() / example_count
 
     def fit(self) -> None:
         """Train model."""
