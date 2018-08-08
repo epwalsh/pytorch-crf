@@ -151,9 +151,17 @@ class Learner:
         self.vocab = vocab
         self.pretrained_word_vecs = pretrained_vecs
         self.model = model
+        self.char_feats_class = char_feats_class
         self.optimizer_class = optim_class
         self.dataset_train = dataset_train
         self.dataset_valid = dataset_valid
+
+    def reset_model(self) -> None:
+        """Initialize model again to completely reset params."""
+        device = get_device(self._opts)
+        char_feats_layer = self.char_feats_class.cl_init(self._opts, self.vocab).to(device)
+        self.model = LSTMCRF.cl_init(self._opts, self.vocab, char_feats_layer,
+                                     self.pretrained_word_vecs).to(device)
 
     def save_train_state(self, path: str) -> None:
         """Save training set state object."""
