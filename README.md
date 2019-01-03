@@ -1,5 +1,7 @@
 # pytorch-crf
 
+:exclamation: NOTE: I no longer maintain this repository. I recommend using [AllenNLP](https://github.com/allenai/allennlp) instead.
+
 A [PyTorch](https://pytorch.org/) implementation of a Bi-LSTM CRF with character-level features.
 
 **pytorch-crf** is a flexible framework that makes it easy to reproduce several state-of-the-art sequence labelling deep neural networks that have proven to excel at the tasks of named entity recognition (NER) and part-of-speech (POS) tagging, among others. Some examples of the models you can reproduce with **pytorch-crf** are:
